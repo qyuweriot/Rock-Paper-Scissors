@@ -138,11 +138,20 @@ describe('実データとの突き合わせ', () => {
     }
   });
 
-  it('粉砕は有利対面75 / 不利対面40 (SPEC §10.1)', () => {
-    const smash = getMove(UNITS.funsai, 0); // 威力50
+  it('粉砕は有利対面70 / 不利対面35 (SPEC §10.1)', () => {
+    const smash = getMove(UNITS.funsai, 0); // 威力45
 
-    expect(dmg(smash.damage, 'gu', 'choki')).toBe(75);
-    expect(dmg(smash.damage, 'gu', 'pa')).toBe(40);
+    expect(dmg(smash.damage, 'gu', 'choki')).toBe(70);
+    expect(dmg(smash.damage, 'gu', 'pa')).toBe(35);
+  });
+
+  it('粉砕は威力が反動を下回るため、互角のHP50 を一撃で倒せない (SPEC §10.1)', () => {
+    const smash = getMove(UNITS.funsai, 0);
+    const neutral = dmg(smash.damage, 'gu', 'gu');
+
+    expect(neutral).toBe(45);
+    expect(neutral).toBeLessThan(UNITS.funsai.maxHp); // ミラーでは倒しきれない
+    expect(smash.recoil).toBeGreaterThan(neutral);
   });
 
   it('粉砕は反動50。撃破に失敗すればHP50を削り切って自滅する (SPEC §10.1)', () => {

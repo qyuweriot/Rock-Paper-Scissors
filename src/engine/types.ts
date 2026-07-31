@@ -3,6 +3,9 @@
  * 仕様の参照先は docs/SPEC.md。
  */
 
+// 型のみの相互参照。実行時の import は生じないので循環にはならない
+import type { EffectHooks } from './effects/context';
+
 // --- 基本 -------------------------------------------------------------------
 
 /** 属性。グー > チョキ > パー > グー (SPEC §2) */
@@ -63,6 +66,11 @@ export interface MoveDef {
   priority: 'first' | 'normal';
   /** 自分が受ける固定の反動。粉砕50 / 石15 / ゴースト5 (SPEC §10.5) */
   recoil?: number;
+  /**
+   * 1試合あたりの使用回数上限 (SPEC §10.11)。使い切ると合法手から外れる。
+   * §7.3 の累積カウントと違い、**交代でリセットされない**。
+   */
+  maxUses?: number;
   selection?: SelectionKind;
   /** 特殊挙動。実装は Phase 3 */
   hooks?: EffectHooks;
@@ -108,6 +116,11 @@ export interface UnitState {
   turnModifiers: Modifiers;
   /** 枠ごとの使用回数。魔球の減衰とハサミムシの増強に使う。交代でリセット (SPEC §7.3) */
   moveUseCounts: [number, number];
+  /**
+   * 試合を通じた枠ごとの使用回数。MoveDef.maxUses の判定に使う。
+   * **交代でも瀕死でもリセットされない** (SPEC §10.11)。
+   */
+  totalMoveUses: [number, number];
 }
 
 export interface SideState {
@@ -192,32 +205,10 @@ export type BattleEvent =
 
 /**
  * 効果を if 文の羅列で書くと15種でも破綻するため、ユニットをフックの集合として表現する。
+ * 実体は effects/context.ts にある(型のみの再輸出なので実行時の循環は生じない)。
  *
- * Phase 1 では**フック名の骨組みのみ**を定義している。引数の正確な形は
- * battle.ts の解決文脈 (Phase 2) が定まらないと決められないため、
- * シグネチャの確定と実装は Phase 3 で行う。
- *
- * ゴール: 新ユニットの追加が、エンジン本体を触らずデータ追加だけで済む状態 (PLAN §84)。
+ * PLAN §3.2 の10個から7個に整理してある。攻勢・守勢修正は SPEC §4.3 が数値状態として
+ * 定めており `UnitState.modifiers` と `computeDamage` で実現済みのためフックにしない。
+ * 設置踏みとリセットは battle.ts の switchIn に集約済み。使用回数カウントは全技共通。
  */
-export interface EffectHooks {
-  /** 魔球の減衰、ハサミムシの増強、鉄拳の追い討ち判定 */
-  onModifyPower?: unknown;
-  /** 攻勢修正 */
-  onModifyDamageDealt?: unknown;
-  /** 守勢修正 */
-  onModifyDamageTaken?: unknown;
-  /** 山嵐の反射。攻撃ダメージ限定 (SPEC §10.7) */
-  onAfterDamageTaken?: unknown;
-  /** ハサミムシの回復無効 (SPEC §10.6) */
-  onHeal?: unknown;
-  /** 粉砕の全回復 (SPEC §10.1) */
-  onKill?: unknown;
-  /** ゴーストの瀕死時反射 (SPEC §10.12) */
-  onFaint?: unknown;
-  /** 設置の踏み判定、修正値・累積カウントのリセット (PLAN §347) */
-  onSwitchIn?: unknown;
-  /** 毒、堅牢の回復 (SPEC §5.6) */
-  onTurnEnd?: unknown;
-  /** 使用回数カウント (SPEC §7.3) */
-  onMoveUsed?: unknown;
-}
+export type { EffectHooks } from './effects/context';

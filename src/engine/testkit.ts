@@ -9,12 +9,25 @@ import { createBattle, getLegalActions, resolveReplacements, resolveTurn } from 
 import type { UnitId } from '../data/units';
 import type { Action, BattleEvent, BattleResult, BattleState, Side, SlotIndex } from './types';
 
-export function makeBattle(p1: UnitId[], p2: UnitId[]): BattleState {
-  return createBattle(p1, p2);
+export function makeBattle(p1: UnitId[], p2: UnitId[], seed = 0): BattleState {
+  return createBattle(p1, p2, seed);
 }
 
 export const move = (slotIndex: SlotIndex): Action => ({ kind: 'move', slotIndex });
 export const switchTo = (toPartyIndex: number): Action => ({ kind: 'switch', toPartyIndex });
+
+/**
+ * 何もしない相手。単体の効果を切り離して観察したいときに使う。
+ *
+ * 器は技2で控えを回復するが、**控えがいなければ空振りする** (SPEC §10.13)。
+ * 1体だけで選出すればダメージも状態異常も一切発生しない。
+ * バラは「ダメージなし」だが毒と設置を撒くので、この用途には使えない。
+ *
+ * **控えがいる場合は回復対象の選択が必須**になるため `inert()` は使えない。
+ * その場合は満タンの控えを指定した行動を自分で組み立てること。
+ */
+export const INERT: UnitId = 'utsuwa';
+export const inert = (): Action => ({ kind: 'move', slotIndex: 1 });
 
 /** 状態を直接仕込む。resolveTurn に渡す前の state に対して使う */
 export function setHp(state: BattleState, side: Side, partyIndex: number, hp: number): void {

@@ -9,6 +9,20 @@
  */
 
 import type { MoveDef, SlotIndex, UnitDef } from '../engine/types';
+import { hasamiGuard } from '../engine/effects/hasami';
+import { issenFocus } from '../engine/effects/issen';
+import { kenroRegeneration } from '../engine/effects/kenro';
+import { baraHazard, baraPoison } from '../engine/effects/bara';
+import { tenohiraRest } from '../engine/effects/tenohira';
+import { utsuwaDevotion } from '../engine/effects/utsuwa';
+import { TENOHIRA_HEAL_USES } from '../engine/constants';
+import { funsaiRegrowth } from '../engine/effects/funsai';
+import { ghostCurse } from '../engine/effects/ghost';
+import { hasamimushiGrowth, hasamimushiHealBlock } from '../engine/effects/hasamimushi';
+import { magyuDecay, magyuEscape } from '../engine/effects/magyu';
+import { tekkenPursuit } from '../engine/effects/tekken';
+import { uchiwaGust } from '../engine/effects/uchiwa';
+import { yamaarashiSpikes } from '../engine/effects/yamaarashi';
 
 export const UNITS = {
   // --- グー -----------------------------------------------------------------
@@ -24,8 +38,8 @@ export const UNITS = {
         kind: 'move',
         move: {
           name: '粉砕撃',
-          text: '威力50。自分に固定50の反動。',
-          damage: { kind: 'normal', power: 50 },
+          text: '威力45。自分に固定50の反動。',
+          damage: { kind: 'normal', power: 45 },
           priority: 'normal',
           recoil: 50,
         },
@@ -35,6 +49,7 @@ export const UNITS = {
         ability: {
           name: '撃破再生',
           text: '相手を倒した場合、HPが全回復する。',
+          hooks: funsaiRegrowth,
         },
       },
     ],
@@ -63,6 +78,7 @@ export const UNITS = {
           text: '威力20。相手がそのターンに交代を宣言していた場合、威力+20。',
           damage: { kind: 'normal', power: 20 },
           priority: 'normal',
+          hooks: tekkenPursuit,
         },
       },
     ],
@@ -82,6 +98,7 @@ export const UNITS = {
           text: '威力30。使うたびに威力−10(下限0)。交代でリセット。',
           damage: { kind: 'normal', power: 30 },
           priority: 'normal',
+          hooks: magyuDecay,
         },
       },
       {
@@ -92,6 +109,7 @@ export const UNITS = {
           damage: { kind: 'normal', power: 15 },
           priority: 'normal',
           selection: 'switchTarget',
+          hooks: magyuEscape,
         },
       },
     ],
@@ -118,6 +136,7 @@ export const UNITS = {
         ability: {
           name: '再生',
           text: 'ターン終了時にHPが5回復する(毒の処理より後)。',
+          hooks: kenroRegeneration,
         },
       },
     ],
@@ -168,6 +187,7 @@ export const UNITS = {
           text: '威力15。使うたびに威力+5(上限なし)。交代でリセット。',
           damage: { kind: 'normal', power: 15 },
           priority: 'normal',
+          hooks: hasamimushiGrowth,
         },
       },
       {
@@ -175,6 +195,7 @@ export const UNITS = {
         ability: {
           name: '治癒封じ',
           text: '場にいる間、相手側で発生するあらゆる回復を無効化する。',
+          hooks: hasamimushiHealBlock,
         },
       },
     ],
@@ -201,6 +222,7 @@ export const UNITS = {
         ability: {
           name: '棘の反射',
           text: '攻撃技でダメージを受けたとき、相手に固定10を返す(ダメージ0でも発動)。',
+          hooks: yamaarashiSpikes,
         },
       },
     ],
@@ -220,6 +242,7 @@ export const UNITS = {
           text: 'ダメージなし。相手に毒を1スタック付与(2重まで)。',
           damage: { kind: 'none' },
           priority: 'normal',
+          hooks: baraPoison,
         },
       },
       {
@@ -229,6 +252,7 @@ export const UNITS = {
           text: 'ダメージなし。相手側の場に設置を1枚追加(2枚まで)。',
           damage: { kind: 'none' },
           priority: 'normal',
+          hooks: baraHazard,
         },
       },
     ],
@@ -257,6 +281,7 @@ export const UNITS = {
           text: '自分の攻勢+10(交代または瀕死まで持続 / 累積上限+20)。',
           damage: { kind: 'none' },
           priority: 'normal',
+          hooks: issenFocus,
         },
       },
     ],
@@ -285,6 +310,7 @@ export const UNITS = {
           text: '威力10。このターン自分の守勢+10(固定ダメージには効かない)。',
           damage: { kind: 'normal', power: 10 },
           priority: 'normal',
+          hooks: hasamiGuard,
         },
       },
     ],
@@ -312,9 +338,11 @@ export const UNITS = {
         kind: 'move',
         move: {
           name: '整息',
-          text: '自分のHPを30回復する(満タンなら何も起こらない)。',
+          text: '自分のHPを30回復する(満タンなら何も起こらない)。1試合3回まで。',
           damage: { kind: 'none' },
           priority: 'normal',
+          maxUses: TENOHIRA_HEAL_USES,
+          hooks: tenohiraRest,
         },
       },
     ],
@@ -342,6 +370,7 @@ export const UNITS = {
         ability: {
           name: '呪詛返し',
           text: '瀕死になったとき、相手に固定30を返す(死因を問わない)。',
+          hooks: ghostCurse,
         },
       },
     ],
@@ -371,6 +400,7 @@ export const UNITS = {
           damage: { kind: 'none' },
           priority: 'normal',
           selection: 'benchAlly',
+          hooks: utsuwaDevotion,
         },
       },
     ],
@@ -399,6 +429,7 @@ export const UNITS = {
           text: '相手を強制的に交代させる(交代先はランダム)。',
           damage: { kind: 'none' },
           priority: 'normal',
+          hooks: uchiwaGust,
         },
       },
     ],

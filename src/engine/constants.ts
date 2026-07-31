@@ -58,3 +58,31 @@ export const PARTY_SIZE = 5;
 export const TEAM_SIZE = 3;
 /** 技枠の数。「技2つ」または「技1つ + 特性1つ」 */
 export const SLOT_COUNT = 2;
+
+// --- ユニット固有の効果量 (SPEC §10) ----------------------------------------
+//
+// 威力・HP・反動は data/units.ts にある。ここに置くのは「効果の大きさ」で、
+// 技データのフィールドとしては表せないもの。バランス調整はこの2ファイルで完結する。
+
+/** 堅牢: ターン終了時の回復量 (§10.4) */
+export const KENRO_TURN_HEAL = 5;
+/** 山嵐: 攻撃技を受けたときに返す固定ダメージ (§10.7) */
+export const YAMAARASHI_REFLECT = 10;
+/** ゴースト: 瀕死時に返す固定ダメージ (§10.12) */
+export const GHOST_FAINT_REFLECT = 30;
+/** 手のひら: 技2の自己回復量 (§10.11) */
+export const TENOHIRA_HEAL = 30;
+/** 手のひら: 技2の1試合あたりの使用回数上限。回復の応酬による膠着を防ぐ (§10.11) */
+export const TENOHIRA_HEAL_USES = 3;
+/** 器: 技2で控え1体を回復する量 (§10.13) */
+export const UTSUWA_HEAL = 15;
+/** 一閃: 技2の攻勢上昇。累積上限は PERSISTENT_MODIFIER_CAP (§10.9) */
+export const ISSEN_ATK_UP = 10;
+/** はさみ: 技2の守勢上昇。このターンのみ (§10.10) */
+export const HASAMI_DEF_UP = 10;
+/** 鉄拳: 追い討ちの威力上昇。相手が交代を宣言していた場合のみ (§10.2) */
+export const TEKKEN_PURSUIT_BONUS = 20;
+/** 魔球: 技1の使用ごとの威力減衰。下限0 (§10.3) */
+export const MAGYU_POWER_DECAY = 10;
+/** ハサミムシ: 技1の使用ごとの威力上昇。上限なし (§10.6) */
+export const HASAMIMUSHI_POWER_GROWTH = 5;

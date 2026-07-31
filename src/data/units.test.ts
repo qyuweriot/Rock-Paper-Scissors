@@ -187,6 +187,26 @@ describe('個別仕様の反映 (SPEC §10)', () => {
     ]);
   });
 
+  it('使用回数制限を持つのは手のひらの技2だけ (SPEC §10.11)', () => {
+    const limited: string[] = [];
+    for (const unit of UNIT_LIST) {
+      unit.slots.forEach((slot, index) => {
+        if (slot.kind === 'move' && slot.move.maxUses !== undefined) {
+          limited.push(`${unit.id}:${String(index)}`);
+        }
+      });
+    }
+    expect(limited).toEqual(['tenohira:1']);
+  });
+
+  it('全ての技に使用回数制限を持つユニットはいない(行動不能になるため)', () => {
+    for (const unit of UNIT_LIST) {
+      const moves = unit.slots.filter((s) => s.kind === 'move');
+      const unlimited = moves.filter((s) => s.kind === 'move' && s.move.maxUses === undefined);
+      expect(unlimited.length).toBeGreaterThanOrEqual(1);
+    }
+  });
+
   it('固定ダメージ技は手のひらの技1だけ (SPEC §4.2)', () => {
     const fixed: string[] = [];
     for (const unit of UNIT_LIST) {
