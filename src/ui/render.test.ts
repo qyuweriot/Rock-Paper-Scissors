@@ -21,7 +21,10 @@ import { BattleScreen } from './screens/BattleScreen';
 import { ResultScreen } from './screens/ResultScreen';
 import { HandoffGate } from './components/HandoffGate';
 import {
+  currentFrame,
+  displayBattle,
   initialState,
+  isPlaying,
   legalActionsFor,
   reduce,
   replacementOptions,
@@ -30,6 +33,7 @@ import {
   type FlowState,
 } from './flow';
 import type { UnitId } from '../data/units';
+import { UNIT_ICONS } from './icons';
 
 const PARTY_A: UnitId[] = ['ishi', 'kenro', 'kami', 'utsuwa', 'magyu'];
 const PARTY_B: UnitId[] = ['hasami', 'ghost', 'bara', 'uchiwa', 'tenohira'];
@@ -62,7 +66,8 @@ function toBattle(mode: 'ai' | 'hotseat'): FlowState {
 }
 
 const battleProps = (state: FlowState, mode: 'ai' | 'hotseat') => {
-  const battle = state.battle;
+  // 画面が実際に使うのと同じ「表示用の盤面」を渡す。再生中はコマになる
+  const battle = displayBattle(state);
   if (!battle) throw new Error('バトルが始まっていません');
   return {
     state,
@@ -70,6 +75,7 @@ const battleProps = (state: FlowState, mode: 'ai' | 'hotseat') => {
     labels: sideLabels(mode),
     onDeclareAction: noop,
     onDeclareReplacement: noop,
+    onSkipPlayback: noop,
   };
 };
 
@@ -128,6 +134,17 @@ describe('画面の描画', () => {
     expect(html).toContain('の行動を選んでください');
     expect(html).toContain('バトルログ');
     expect(html).toContain('交代');
+    expect(html).toContain('ターン目');
+    expect(html).toContain('VS');
+  });
+
+  it('ステージにアイコンと効果テキストが出る (PLAN §296)', () => {
+    const state = toBattle('ai');
+    const html = renderToStaticMarkup(h(BattleScreen, battleProps(state, 'ai')));
+
+    // 先頭は石。アイコンと技の効果テキストが両方出ている
+    expect(html).toContain(UNIT_ICONS.ishi);
+    expect(html).toContain('威力25');
   });
 
   it('結果。勝ち負けと引き分けの両方 (SPEC §8)', () => {
@@ -149,7 +166,7 @@ describe('対人戦の秘匿が描画にも効いている (SPEC §11)', () => {
   const html = renderToStaticMarkup(h(BattleScreen, battleProps(toBattle('hotseat'), 'hotseat')));
 
   it('相手の控えは伏せられる', () => {
-    expect(html).toContain('? ? ?');
+    expect(html).toContain('bench-dot--hidden');
   });
 
   it('相手の控えの名前が漏れない', () => {
@@ -164,16 +181,23 @@ describe('対人戦の秘匿が描画にも効いている (SPEC §11)', () => {
 });
 
 describe('AI戦を通しで完走できる (PLAN §301)', () => {
-  it('決着まで進み、途中の死に出し画面も描画できる', () => {
+  it('決着まで進み、再生の全コマと死に出し画面を描画できる', () => {
     let state = toBattle('ai');
     let renderedReplacement = false;
+    let renderedFrames = 0;
 
-    for (let i = 0; i < 400 && state.screen.kind === 'battle'; i++) {
-      const turn = state.turn;
-      if (!turn) throw new Error('入力待ちが立っていません');
-
-      // 毎ターン描画して、途中で落ちないことを確かめる
+    for (let i = 0; i < 2000 && state.screen.kind === 'battle'; i++) {
+      // どの段階でも描画できることを確かめる。再生の途中も含む
       expect(() => renderToStaticMarkup(h(BattleScreen, battleProps(state, 'ai')))).not.toThrow();
+
+      if (isPlaying(state)) {
+        renderedFrames += 1;
+        state = reduce(state, { type: 'advancePlayback' });
+        continue;
+      }
+
+      const turn = state.turn;
+      if (!turn) throw new Error('入力待ちも再生も立っていません');
 
       if (turn.kind === 'actionGate' || turn.kind === 'replacementGate') {
         state = reduce(state, { type: 'confirmGate' });
@@ -194,6 +218,7 @@ describe('AI戦を通しで完走できる (PLAN §301)', () => {
 
     expect(state.screen.kind).toBe('result');
     expect(renderedReplacement).toBe(true); // 死に出しを必ず通る
+    expect(renderedFrames).toBeGreaterThan(20); // 再生のコマを大量に描いている
     expect(state.log.length).toBeGreaterThan(10);
 
     if (state.screen.kind === 'result') {
@@ -209,5 +234,19 @@ describe('AI戦を通しで完走できる (PLAN §301)', () => {
       );
       expect(html).toContain('バトルログ');
     }
+  });
+
+  it('再生中はスキップが出て、行動選択は出ない', () => {
+    const state = toBattle('ai');
+    const action = legalActionsFor(state, 'p1')[0];
+    if (!action) throw new Error('合法手がありません');
+    const playing = reduce(state, { type: 'declareAction', action });
+    expect(isPlaying(playing)).toBe(true);
+
+    const html = renderToStaticMarkup(h(BattleScreen, battleProps(playing, 'ai')));
+    expect(html).toContain('スキップ');
+    expect(html).not.toContain('の行動を選んでください');
+    // いま何が起きているかが中央に出る
+    expect(html).toContain(currentFrame(playing)?.entry.text ?? '');
   });
 });

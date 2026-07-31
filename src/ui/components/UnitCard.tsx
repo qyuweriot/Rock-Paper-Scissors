@@ -6,6 +6,7 @@
 
 import { getUnit, type UnitId } from '../../data/units';
 import type { UnitState } from '../../engine/types';
+import { UNIT_ICONS } from '../icons';
 import { ATTRIBUTE_LABELS, SPEED_LABELS } from '../labels';
 import { HpBar } from './HpBar';
 import { StatusBadges } from './StatusBadges';
@@ -46,6 +47,9 @@ export function UnitCard({ unitId, state, onClick, selected, disabled, hidden, c
   const body = (
     <>
       <div className="unit-card__head">
+        <span className={`unit-card__icon unit-card__icon--${def.attribute}`}>
+          {UNIT_ICONS[unitId]}
+        </span>
         <span className="unit-card__name">{def.name}</span>
         <span className="unit-card__tags">
           {ATTRIBUTE_LABELS[def.attribute]} / 速度{SPEED_LABELS[def.speed]}

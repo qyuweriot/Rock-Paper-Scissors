@@ -22,7 +22,8 @@ import { draftParty, draftTeam } from '../ai/draft';
 import { PARTY_SIZE, TEAM_SIZE } from '../engine/constants';
 import type { UnitId } from '../data/units';
 import type { Action, BattleEvent, BattleResult, BattleState, Side } from '../engine/types';
-import { AI_LABELS, formatEvents, HOTSEAT_LABELS, turnHeading, type LogEntry } from './log';
+import { AI_LABELS, HOTSEAT_LABELS, turnHeading, type LogEntry } from './log';
+import { buildFrames, type Frame } from './playback';
 
 export type Mode = 'ai' | 'hotseat';
 
@@ -75,6 +76,11 @@ export interface FlowState {
    * **控えに戻っても公開し続ける**ため、現在の場のユニットとは別に持つ。
    */
   revealed: Record<Side, number[]>;
+  /**
+   * ターン解決の再生 (1ステップずつ見せる)。null なら再生していない。
+   * **再生中は入力を受け付けない。** `turn` を立てるのは再生が終わってから。
+   */
+  playback: { frames: Frame[]; index: number } | null;
   log: LogEntry[];
   /** 団扇の抽選とAIの編成に使う (PLAN §3.4) */
   rngSeed: number;
@@ -87,6 +93,10 @@ export type FlowEvent =
   | { type: 'setTeam'; team: UnitId[] }
   | { type: 'declareAction'; action: Action }
   | { type: 'declareReplacement'; partyIndex: number }
+  /** 再生を1コマ進める。末尾まで来たら本編を再開する */
+  | { type: 'advancePlayback' }
+  /** 残りのコマを飛ばして本編を再開する */
+  | { type: 'skipPlayback' }
   | { type: 'restart' }
   | { type: 'toTitle' };
 
@@ -104,6 +114,7 @@ export function initialState(seed: number): FlowState {
     declared: {},
     replacements: {},
     revealed: { p1: [], p2: [] },
+    playback: null,
     log: [],
     rngSeed: seed,
   };
@@ -193,17 +204,12 @@ function advanceAction(state: FlowState, battle: BattleState): FlowState {
   if (!p1 || !p2) return state;
 
   const step = resolveTurn(battle, { p1, p2 });
-  return advance({
-    ...state,
-    battle: step.state,
-    declared: {},
-    revealed: withRevealed(state.revealed, step.events),
-    log: [
-      ...state.log,
-      turnHeading(battle.turn),
-      ...formatEvents(step.events, step.state, sideLabels(state.mode)),
-    ],
-  });
+  return startPlayback(
+    { ...state, battle: step.state, declared: {} },
+    battle,
+    step.events,
+    turnHeading(battle.turn),
+  );
 }
 
 function advanceReplacement(state: FlowState, battle: BattleState): FlowState {
@@ -234,32 +240,50 @@ function advanceReplacement(state: FlowState, battle: BattleState): FlowState {
   }
 
   const step = resolveReplacements(battle, state.replacements);
-  return advance({
-    ...state,
-    battle: step.state,
-    replacements: {},
-    revealed: withRevealed(state.revealed, step.events),
-    log: [...state.log, ...formatEvents(step.events, step.state, sideLabels(state.mode))],
-  });
+  return startPlayback({ ...state, battle: step.state, replacements: {} }, battle, step.events, null);
+}
+
+// --- 再生 -------------------------------------------------------------------
+
+/**
+ * ターン解決の結果を「1コマずつ見せる」状態にして止める。
+ *
+ * **ここで advance を呼ばない。** 呼ぶと次の入力待ちまで一気に進んでしまい、
+ * 何が起きたのか見えないまま盤面だけが変わる。再生が終わってから再開する。
+ *
+ * イベントが1件もなければ再生することがないので、そのまま本編を進める。
+ */
+function startPlayback(
+  state: FlowState,
+  before: BattleState,
+  events: BattleEvent[],
+  heading: LogEntry | null,
+): FlowState {
+  const log = heading ? [...state.log, heading] : state.log;
+  if (events.length === 0) return advance({ ...state, log });
+
+  const frames = buildFrames(before, events, state.revealed, sideLabels(state.mode));
+  return { ...state, log, playback: { frames, index: 0 }, turn: null };
 }
 
 /**
- * 交代イベントから「場に出たユニット」を拾う (SPEC §11)。
- * 通常交代・強制交代・自己交代・死に出しのすべてが switch イベントを出すので、
- * ここだけ見れば公開済みの集合が保てる。
+ * 再生を終えて本編を再開する。
+ *
+ * 再生中に見せていた盤面は**イベントから組み直した表示用のもの**なので、
+ * ここでエンジンの権威ある状態 (`state.battle`) に戻す。
+ * 表示用の再構成が本編に漏れないのはこの一手のおかげ。
  */
-function withRevealed(
-  revealed: Record<Side, number[]>,
-  events: BattleEvent[],
-): Record<Side, number[]> {
-  let next = revealed;
-  for (const event of events) {
-    if (event.type !== 'switch') continue;
-    const current = next[event.side];
-    if (current.includes(event.to.partyIndex)) continue;
-    next = { ...next, [event.side]: [...current, event.to.partyIndex] };
-  }
-  return next;
+function finishPlayback(state: FlowState): FlowState {
+  const playback = state.playback;
+  if (!playback) return state;
+
+  const last = playback.frames[playback.frames.length - 1];
+  return advance({
+    ...state,
+    playback: null,
+    revealed: last ? last.revealed : state.revealed,
+    log: [...state.log, ...playback.frames.map((frame) => frame.entry)],
+  });
 }
 
 /** AI を1体作り、シードを進めた状態を返す */
@@ -292,6 +316,7 @@ export function reduce(state: FlowState, event: FlowEvent): FlowState {
       return setTeam(state, event.team);
 
     case 'declareAction': {
+      if (state.playback) return state; // 再生中は受け付けない
       if (state.turn?.kind !== 'awaitAction') return state;
       const side = state.turn.side;
       return advance({
@@ -302,6 +327,7 @@ export function reduce(state: FlowState, event: FlowEvent): FlowState {
     }
 
     case 'declareReplacement': {
+      if (state.playback) return state; // 再生中は受け付けない
       if (state.turn?.kind !== 'awaitReplacement') return state;
       const side = state.turn.side;
       return advance({
@@ -310,6 +336,18 @@ export function reduce(state: FlowState, event: FlowEvent): FlowState {
         replacements: { ...state.replacements, [side]: event.partyIndex },
       });
     }
+
+    case 'advancePlayback': {
+      const playback = state.playback;
+      if (!playback) return state;
+      const next = playback.index + 1;
+      // 末尾を過ぎたら本編を再開する
+      if (next >= playback.frames.length) return finishPlayback(state);
+      return { ...state, playback: { ...playback, index: next } };
+    }
+
+    case 'skipPlayback':
+      return state.playback ? finishPlayback(state) : state;
 
     case 'restart':
       // 同じモード・同じ難易度で編成からやり直す
@@ -404,6 +442,41 @@ function setTeam(state: FlowState, team: UnitId[]): FlowState {
 
 // --- 表示用の派生 -----------------------------------------------------------
 
+// --- 表示用の派生 -----------------------------------------------------------
+//
+// **コンポーネントは生の state.battle を見ない。** 再生中は組み直した盤面を見せ、
+// 再生が終わったらエンジンの状態に戻る。この一枚を挟むことで、
+// 「表示は途中、判定は最終」という取り違えが起きなくなる。
+
+/** いま画面に出すべき盤面 */
+export function displayBattle(state: FlowState): BattleState | null {
+  const frame = currentFrame(state);
+  return frame ? frame.battle : state.battle;
+}
+
+/** いま画面に出すべきログ。再生中は再生済みのぶんだけ */
+export function displayLog(state: FlowState): LogEntry[] {
+  const playback = state.playback;
+  if (!playback) return state.log;
+  return [...state.log, ...playback.frames.slice(0, playback.index + 1).map((f) => f.entry)];
+}
+
+/** いま公開されている相手のユニット (SPEC §11)。交代のコマで初めて増える */
+export function displayRevealed(state: FlowState): Record<Side, number[]> {
+  const frame = currentFrame(state);
+  return frame ? frame.revealed : state.revealed;
+}
+
+/** 再生中のコマ。エフェクトの元になる */
+export function currentFrame(state: FlowState): Frame | null {
+  const playback = state.playback;
+  return playback ? (playback.frames[playback.index] ?? null) : null;
+}
+
+export function isPlaying(state: FlowState): boolean {
+  return state.playback !== null;
+}
+
 /** ゲート画面に出す文言 */
 export function gateMessage(state: FlowState): string | null {
   if (state.screen.kind === 'selectGate') {
@@ -439,7 +512,7 @@ export function isUnitVisible(
 ): boolean {
   if (state.mode === 'ai') return true;
   if (viewer === side) return true;
-  return state.revealed[side].includes(partyIndex);
+  return displayRevealed(state)[side].includes(partyIndex);
 }
 
 export { opponentOf };

@@ -251,6 +251,12 @@ button.unit-card:disabled {
   gap: 0.5rem;
 }
 
+.unit-card__icon {
+  margin-right: 0.35rem;
+  font-size: 1.15rem;
+  line-height: 1;
+}
+
 .unit-card__name {
   font-weight: 700;
   font-size: 1.05rem;
@@ -449,80 +455,384 @@ button.unit-card:disabled {
   font-size: 0.9rem;
 }
 
-/* --- バトル -------------------------------------------------------------- */
+/* --- バトル: 対面ステージ ------------------------------------------------ */
 
-.field {
-  display: grid;
-  gap: 0.75rem;
-  margin-bottom: 1rem;
-}
-
-.field__side {
-  padding: 0.75rem;
-  border: 1px solid var(--border);
-  border-radius: 0.75rem;
-  background: #1a1a20;
-}
-
-.field__side--p1 {
-  border-color: #2f3d4e;
-}
-
-.field__head {
+.battle-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 0.5rem;
-  margin-bottom: 0.5rem;
+  margin-bottom: 0.6rem;
 }
 
-.field__head h3 {
-  margin: 0;
-  font-size: 0.9rem;
+.battle-head__turn {
+  font-size: 0.85rem;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.btn--skip {
+  padding: 0.35rem 0.8rem;
+  font-size: 0.8rem;
+  align-items: center;
+  background: var(--surface-2);
+}
+
+/* 再生中に画面全体を覆う当たり判定。見た目は出さない */
+.playback-skip-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 5;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.stage {
+  display: grid;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.stage__side {
+  position: relative;
+}
+
+.stage__meta {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.35rem;
+}
+
+.stage__label {
+  font-size: 0.8rem;
   color: var(--muted);
 }
 
-.bench {
+.stage__divider {
   display: flex;
-  flex-wrap: wrap;
-  gap: 0.4rem;
+  align-items: center;
+  gap: 0.75rem;
+  margin: 0.75rem 0 0.25rem;
+}
+
+.stage__divider::before,
+.stage__divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+
+.stage__vs {
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.15em;
+  color: var(--muted);
+}
+
+/* 再生中に「いま何が起きているか」を中央に出す */
+.stage__caption {
+  flex: 0 1 auto;
+  max-width: 60%;
+  padding: 0.2rem 0.7rem;
+  border: 1px solid var(--accent);
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: 0.8rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  animation: caption-in 0.2s ease-out;
+}
+
+@keyframes caption-in {
+  from {
+    opacity: 0;
+    transform: translateY(-0.25rem);
+  }
+}
+
+/* --- ステージ上の1体 ----------------------------------------------------- */
+
+.stage-unit {
+  padding: 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+  background: var(--surface);
+  transition: opacity 0.3s;
+}
+
+.stage-unit.is-fainted {
+  opacity: 0.4;
+}
+
+.stage-unit__main {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.stage-unit__icon {
+  position: relative;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 3.5rem;
+  height: 3.5rem;
+  border-radius: 50%;
+  background: var(--surface-2);
+  border: 2px solid var(--border);
+}
+
+.stage-unit__emoji {
+  font-size: 1.9rem;
+  line-height: 1;
+}
+
+.stage-unit__emoji--gu {
+  filter: drop-shadow(0 0 6px rgba(232, 132, 92, 0.5));
+}
+.stage-unit__emoji--choki {
+  filter: drop-shadow(0 0 6px rgba(127, 200, 169, 0.5));
+}
+.stage-unit__emoji--pa {
+  filter: drop-shadow(0 0 6px rgba(154, 140, 240, 0.5));
+}
+
+.stage-unit__info {
+  flex: 1;
+  min-width: 0;
+}
+
+.stage-unit__name-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.stage-unit__name {
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+
+.stage-unit__tags {
+  font-size: 0.72rem;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+/* 効果テキストは常に出す (PLAN §296) */
+.stage-unit__slots {
   margin: 0.6rem 0 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 0.3rem;
+}
+
+/* --- 控えの丸 ------------------------------------------------------------ */
+
+.bench-dots {
+  display: flex;
+  gap: 0.3rem;
+  margin: 0;
   padding: 0;
   list-style: none;
 }
 
-.bench__item {
+.bench-dot {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.15rem 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  font-size: 0.72rem;
+}
+
+.bench-dot--fainted {
+  opacity: 0.35;
+}
+
+.bench-dot--hidden {
+  color: var(--muted);
+  border-style: dashed;
+}
+
+.bench-dot__icon {
+  font-size: 0.9rem;
+  line-height: 1;
+}
+
+.bench-dot__hp {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.bench-dot__poison {
+  margin-left: 0.2rem;
+  font-style: normal;
+  color: #d9a6e8;
+}
+
+.bench-dot__name {
+  color: var(--muted);
+}
+
+/* --- エフェクト ---------------------------------------------------------- */
+
+.floating {
+  position: absolute;
+  left: 50%;
+  bottom: 100%;
   display: flex;
   align-items: baseline;
-  gap: 0.4rem;
-  padding: 0.25rem 0.6rem;
-  border: 1px solid var(--border);
-  border-radius: 0.4rem;
-  font-size: 0.8rem;
-  background: var(--surface);
+  gap: 0.2rem;
+  padding: 0.1rem 0.4rem;
+  border-radius: 0.35rem;
+  font-size: 1.05rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  pointer-events: none;
+  transform: translateX(-50%);
+  animation: float-up 0.9s ease-out forwards;
 }
 
-.bench__item.is-fainted {
-  opacity: 0.4;
-}
-
-.bench__name {
+.floating__note {
+  font-size: 0.68rem;
   font-weight: 600;
+  font-style: normal;
+  opacity: 0.85;
 }
 
-.bench__name--hidden {
-  color: var(--muted);
-  letter-spacing: 0.1em;
+.floating--damage {
+  color: #ff8a8a;
+  background: rgba(224, 92, 92, 0.16);
 }
-
-.bench__hp,
-.bench__poison {
-  color: var(--muted);
-  font-size: 0.75rem;
+.floating--heal {
+  color: #7ce0a8;
+  background: rgba(92, 201, 138, 0.16);
 }
-
-.bench__poison {
+.floating--poison {
   color: #d9a6e8;
+  background: rgba(154, 92, 176, 0.18);
+}
+.floating--modifier {
+  color: #f0b48c;
+  background: rgba(224, 178, 92, 0.16);
+}
+.floating--faint {
+  color: var(--danger);
+  background: rgba(224, 92, 92, 0.2);
+  font-size: 0.85rem;
+}
+
+@keyframes float-up {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, 0.5rem);
+  }
+  25% {
+    opacity: 1;
+    transform: translate(-50%, -0.2rem);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -1.6rem);
+  }
+}
+
+/* 被弾で揺れて赤く光る */
+.stage-unit__icon.is-damage {
+  animation: shake 0.42s ease-in-out;
+  border-color: var(--danger);
+}
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  15% { transform: translateX(-0.4rem); }
+  30% { transform: translateX(0.35rem); }
+  45% { transform: translateX(-0.25rem); }
+  60% { transform: translateX(0.2rem); }
+  80% { transform: translateX(-0.1rem); }
+}
+
+.stage-unit__icon.is-heal {
+  animation: pulse 0.6s ease-out;
+  border-color: var(--ok);
+}
+
+@keyframes pulse {
+  0% { box-shadow: 0 0 0 0 rgba(92, 201, 138, 0.55); }
+  100% { box-shadow: 0 0 0 1.1rem rgba(92, 201, 138, 0); }
+}
+
+.stage-unit__icon.is-faint {
+  animation: collapse 0.8s ease-in forwards;
+}
+
+@keyframes collapse {
+  to {
+    transform: rotate(-70deg) scale(0.75);
+    opacity: 0.25;
+  }
+}
+
+.stage-unit__icon.is-switch {
+  animation: slide-in 0.5s ease-out;
+  border-color: var(--accent);
+}
+
+.stage-unit--top .stage-unit__icon.is-switch {
+  animation-name: slide-in-top;
+}
+
+@keyframes slide-in {
+  from { transform: translateY(2rem); opacity: 0; }
+}
+
+@keyframes slide-in-top {
+  from { transform: translateY(-2rem); opacity: 0; }
+}
+
+.stage-unit__icon.is-poison {
+  animation: pulse-poison 0.6s ease-out;
+  border-color: #9a5cb0;
+}
+
+@keyframes pulse-poison {
+  0% { box-shadow: 0 0 0 0 rgba(154, 92, 176, 0.55); }
+  100% { box-shadow: 0 0 0 1.1rem rgba(154, 92, 176, 0); }
+}
+
+.stage-unit__icon.is-modifier {
+  animation: pulse-mod 0.6s ease-out;
+  border-color: var(--warn);
+}
+
+@keyframes pulse-mod {
+  0% { box-shadow: 0 0 0 0 rgba(224, 178, 92, 0.5); }
+  100% { box-shadow: 0 0 0 1.1rem rgba(224, 178, 92, 0); }
+}
+
+/* 動きを減らす設定を尊重する */
+@media (prefers-reduced-motion: reduce) {
+  .floating,
+  .stage-unit__icon,
+  .stage__caption {
+    animation: none !important;
+  }
+  .floating {
+    opacity: 1;
+  }
 }
 
 /* --- 行動選択 ------------------------------------------------------------ */
@@ -673,7 +983,42 @@ button.unit-card:disabled {
     padding: 2rem 1.5rem 4rem;
   }
 
-  .field {
-    grid-template-columns: 1fr 1fr;
+  .stage-unit__icon {
+    width: 4.25rem;
+    height: 4.25rem;
+  }
+
+  .stage-unit__emoji {
+    font-size: 2.3rem;
+  }
+
+  .screen--battle {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 20rem;
+    grid-template-areas:
+      'head log'
+      'stage log'
+      'panel log';
+    gap: 0 1.25rem;
+    align-items: start;
+  }
+
+  .screen--battle .battle-head {
+    grid-area: head;
+  }
+  .screen--battle .stage {
+    grid-area: stage;
+  }
+  .screen--battle .panel {
+    grid-area: panel;
+  }
+  .screen--battle .log {
+    grid-area: log;
+    position: sticky;
+    top: 1rem;
+  }
+
+  .screen--battle .log__list {
+    max-height: 32rem;
   }
 }

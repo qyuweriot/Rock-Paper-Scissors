@@ -1,8 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import {
   activeInputSide,
+  currentFrame,
+  displayBattle,
+  displayLog,
   gateMessage,
   initialState,
+  isPlaying,
   isUnitVisible,
   legalActionsFor,
   reduce,
@@ -24,6 +28,41 @@ const run = (state: FlowState, events: FlowEvent[]): FlowState =>
 
 const start = (mode: 'ai' | 'hotseat', aiLevel: AiLevel = 2, seed = 1234): FlowState =>
   reduce(initialState(seed), { type: 'chooseMode', mode, aiLevel });
+
+/** 再生中なら飛ばして本編に戻す。遷移だけを見たいテストで使う */
+const settle = (state: FlowState): FlowState =>
+  isPlaying(state) ? reduce(state, { type: 'skipPlayback' }) : state;
+
+/**
+ * 決着まで自動で進める。再生・ゲート・行動・死に出しをすべて捌く。
+ * `onState` で各段階を覗ける。
+ */
+function playOut(initial: FlowState, onState?: (s: FlowState) => void, limit = 1000): FlowState {
+  let state = initial;
+  for (let i = 0; i < limit && state.screen.kind === 'battle'; i++) {
+    onState?.(state);
+
+    if (isPlaying(state)) {
+      state = reduce(state, { type: 'advancePlayback' });
+      continue;
+    }
+    const turn = state.turn;
+    if (!turn) throw new Error('入力待ちも再生も立っていません');
+
+    if (turn.kind === 'actionGate' || turn.kind === 'replacementGate') {
+      state = reduce(state, { type: 'confirmGate' });
+    } else if (turn.kind === 'awaitAction') {
+      const action = legalActionsFor(state, turn.side)[0];
+      if (!action) throw new Error('合法手がありません');
+      state = reduce(state, { type: 'declareAction', action });
+    } else {
+      const choice = replacementOptions(state, turn.side)[0];
+      if (choice === undefined) throw new Error('交代先がありません');
+      state = reduce(state, { type: 'declareReplacement', partyIndex: choice });
+    }
+  }
+  return state;
+}
 
 /** バトル画面まで進める */
 function toBattle(mode: 'ai' | 'hotseat', seed = 1234): FlowState {
@@ -93,37 +132,28 @@ describe('flow — AI戦の遷移 (PLAN §290)', () => {
     expect(gateMessage(state)).toBeNull();
   });
 
-  it('人間が宣言すると、AIの宣言とターン解決まで一気に進む', () => {
+  it('人間が宣言すると、AIも宣言してターンが解決され、再生が始まる', () => {
     const state = toBattle('ai');
     const action = legalActionsFor(state, 'p1')[0];
     if (!action) throw new Error('合法手がありません');
 
     const after = reduce(state, { type: 'declareAction', action });
 
-    // ターンが進み、ログが出て、また人間の入力待ちに戻っている
+    // ターンは解決済みだが、再生中なので入力は受け付けない
     expect(after.battle?.turn).toBeGreaterThan(state.battle?.turn ?? 0);
-    expect(after.log.length).toBeGreaterThan(0);
-    expect(activeInputSide(after)).toBe('p1');
+    expect(isPlaying(after)).toBe(true);
+    expect(activeInputSide(after)).toBeNull();
     expect(after.declared).toEqual({});
+
+    // 再生を飛ばすと次の入力待ちに戻る
+    const settled = reduce(after, { type: 'skipPlayback' });
+    expect(isPlaying(settled)).toBe(false);
+    expect(activeInputSide(settled)).toBe('p1');
+    expect(settled.log.length).toBeGreaterThan(0);
   });
 
   it('決着まで進めると結果画面になる', () => {
-    let state = toBattle('ai');
-
-    for (let i = 0; i < 300 && state.screen.kind === 'battle'; i++) {
-      if (state.turn?.kind === 'awaitAction') {
-        const action = legalActionsFor(state, state.turn.side)[0];
-        if (!action) throw new Error('合法手がありません');
-        state = reduce(state, { type: 'declareAction', action });
-      } else if (state.turn?.kind === 'awaitReplacement') {
-        const options = replacementOptions(state, state.turn.side);
-        const choice = options[0];
-        if (choice === undefined) throw new Error('交代先がありません');
-        state = reduce(state, { type: 'declareReplacement', partyIndex: choice });
-      } else {
-        throw new Error(`想定外の段: ${JSON.stringify(state.turn)}`);
-      }
-    }
+    const state = playOut(toBattle('ai'));
 
     expect(state.screen.kind).toBe('result');
     if (state.screen.kind === 'result') {
@@ -194,10 +224,15 @@ describe('flow — 対人戦の秘匿フロー (SPEC §11)', () => {
     if (!a2) throw new Error('合法手がありません');
     const resolved = reduce(state, { type: 'declareAction', action: a2 });
 
-    // 両者揃ったのでターンが解決され、次のターンの P1 ゲートに戻る
+    // 両者揃ったのでターンが解決され、まず再生が始まる
     expect(resolved.declared).toEqual({});
-    expect(resolved.log.length).toBeGreaterThan(0);
-    expect(resolved.turn).toEqual({ kind: 'actionGate', side: 'p1' });
+    expect(isPlaying(resolved)).toBe(true);
+    expect(resolved.turn).toBeNull();
+
+    // 再生が終わると次のターンの P1 ゲートに戻る
+    const settled = settle(resolved);
+    expect(settled.log.length).toBeGreaterThan(0);
+    expect(settled.turn).toEqual({ kind: 'actionGate', side: 'p1' });
   });
 
   it('ゲート中は行動宣言を受け付けない', () => {
@@ -209,26 +244,7 @@ describe('flow — 対人戦の秘匿フロー (SPEC §11)', () => {
   });
 
   it('対人戦を決着まで進められる (PLAN §301)', () => {
-    let state = toBattle('hotseat');
-
-    for (let i = 0; i < 1000 && state.screen.kind === 'battle'; i++) {
-      const turn = state.turn;
-      if (!turn) throw new Error('入力待ちが立っていません');
-
-      if (turn.kind === 'actionGate' || turn.kind === 'replacementGate') {
-        state = reduce(state, { type: 'confirmGate' });
-      } else if (turn.kind === 'awaitAction') {
-        const action = legalActionsFor(state, turn.side)[0];
-        if (!action) throw new Error('合法手がありません');
-        state = reduce(state, { type: 'declareAction', action });
-      } else {
-        const choice = replacementOptions(state, turn.side)[0];
-        if (choice === undefined) throw new Error('交代先がありません');
-        state = reduce(state, { type: 'declareReplacement', partyIndex: choice });
-      }
-    }
-
-    expect(state.screen.kind).toBe('result');
+    expect(playOut(toBattle('hotseat')).screen.kind).toBe('result');
   });
 });
 
@@ -258,23 +274,29 @@ describe('flow — 相手の控えの秘匿 (SPEC §11)', () => {
   it('一度場に出たユニットは控えに戻っても公開し続ける (SPEC §11)', () => {
     let state = toBattle('hotseat');
 
-    // p2 が控えの1番へ交代するまで進める
-    for (let i = 0; i < 40 && state.screen.kind === 'battle'; i++) {
-      const turn = state.turn;
-      if (!turn) break;
-      if (turn.kind === 'actionGate' || turn.kind === 'replacementGate') {
-        state = reduce(state, { type: 'confirmGate' });
-      } else if (turn.kind === 'awaitAction') {
-        const actions = legalActionsFor(state, turn.side);
-        // p2 は交代を、p1 は技を選ぶ
-        const action =
-          turn.side === 'p2' ? (actions.find((a) => a.kind === 'switch') ?? actions[0]) : actions[0];
-        if (!action) throw new Error('合法手がありません');
-        state = reduce(state, { type: 'declareAction', action });
+    // p2 が控えへ交代するまで進める
+    for (let i = 0; i < 60 && state.screen.kind === 'battle'; i++) {
+      if (isPlaying(state)) {
+        state = reduce(state, { type: 'advancePlayback' });
       } else {
-        const choice = replacementOptions(state, turn.side)[0];
-        if (choice === undefined) break;
-        state = reduce(state, { type: 'declareReplacement', partyIndex: choice });
+        const turn = state.turn;
+        if (!turn) break;
+        if (turn.kind === 'actionGate' || turn.kind === 'replacementGate') {
+          state = reduce(state, { type: 'confirmGate' });
+        } else if (turn.kind === 'awaitAction') {
+          const actions = legalActionsFor(state, turn.side);
+          // p2 は交代を、p1 は技を選ぶ
+          const action =
+            turn.side === 'p2'
+              ? (actions.find((a) => a.kind === 'switch') ?? actions[0])
+              : actions[0];
+          if (!action) throw new Error('合法手がありません');
+          state = reduce(state, { type: 'declareAction', action });
+        } else {
+          const choice = replacementOptions(state, turn.side)[0];
+          if (choice === undefined) break;
+          state = reduce(state, { type: 'declareReplacement', partyIndex: choice });
+        }
       }
       if (state.revealed.p2.length > 1) break;
     }
@@ -284,6 +306,119 @@ describe('flow — 相手の控えの秘匿 (SPEC §11)', () => {
     for (const index of state.revealed.p2) {
       expect(isUnitVisible(state, 'p2', index, 'p1')).toBe(true);
     }
+  });
+});
+
+describe('flow — ターン解決の再生', () => {
+  /** 1ターン解決して再生中の状態にする */
+  const playing = (): FlowState => {
+    const state = toBattle('ai');
+    const action = legalActionsFor(state, 'p1')[0];
+    if (!action) throw new Error('合法手がありません');
+    return reduce(state, { type: 'declareAction', action });
+  };
+
+  it('解決直後は再生の先頭で止まる', () => {
+    const state = playing();
+    expect(state.playback?.index).toBe(0);
+    expect(state.playback?.frames.length).toBeGreaterThan(0);
+  });
+
+  it('再生中は行動宣言も死に出しも受け付けない', () => {
+    const state = playing();
+    const action = legalActionsFor(state, 'p1')[0];
+    if (!action) throw new Error('合法手がありません');
+
+    expect(reduce(state, { type: 'declareAction', action })).toBe(state);
+    expect(reduce(state, { type: 'declareReplacement', partyIndex: 1 })).toBe(state);
+  });
+
+  it('advancePlayback で1コマずつ進む', () => {
+    let state = playing();
+    const total = state.playback?.frames.length ?? 0;
+    expect(total).toBeGreaterThan(1);
+
+    for (let i = 1; i < total; i++) {
+      state = reduce(state, { type: 'advancePlayback' });
+      expect(state.playback?.index).toBe(i);
+    }
+
+    // 末尾を過ぎたら本編が再開する
+    state = reduce(state, { type: 'advancePlayback' });
+    expect(isPlaying(state)).toBe(false);
+  });
+
+  it('ログは再生済みのぶんだけ出る', () => {
+    let state = playing();
+    const total = state.playback?.frames.length ?? 0;
+    const before = displayLog(state).length;
+
+    state = reduce(state, { type: 'advancePlayback' });
+    expect(displayLog(state).length).toBe(before + 1);
+
+    // 全部再生し終えると、コマの数だけログが増えている
+    const settled = settle(state);
+    expect(settled.log.length).toBeGreaterThanOrEqual(total);
+  });
+
+  it('表示用の盤面は再生の進みに追従し、最後はエンジンの状態に戻る', () => {
+    let state = playing();
+    const authoritative = state.battle;
+
+    // 先頭のコマは解決前に近い盤面。エンジンの最終状態とは限らない
+    expect(displayBattle(state)).toEqual(state.playback?.frames[0]?.battle);
+
+    state = settle(state);
+    // 再生後は権威ある状態そのもの
+    expect(displayBattle(state)).toBe(state.battle);
+    expect(state.battle).toBe(authoritative);
+  });
+
+  it('currentFrame がエフェクトの元になるコマを返す', () => {
+    const state = playing();
+    expect(currentFrame(state)).toBe(state.playback?.frames[0]);
+    expect(currentFrame(settle(state))).toBeNull();
+  });
+
+  it('skipPlayback は残りを飛ばして本編を再開する', () => {
+    const state = playing();
+    const skipped = reduce(state, { type: 'skipPlayback' });
+
+    expect(isPlaying(skipped)).toBe(false);
+    // 飛ばしてもログは全部残る。見逃しても後から読める
+    expect(skipped.log.length).toBeGreaterThanOrEqual(state.playback?.frames.length ?? 0);
+  });
+
+  it('再生していないときの再生イベントは無視される', () => {
+    const state = settle(playing());
+    expect(reduce(state, { type: 'advancePlayback' })).toBe(state);
+    expect(reduce(state, { type: 'skipPlayback' })).toBe(state);
+  });
+
+  it('死に出しの解決も再生される (SPEC §5.7)', () => {
+    let sawReplacementPlayback = false;
+    let previousTurn: FlowState['turn'] = null;
+
+    playOut(toBattle('ai'), (state) => {
+      // 直前が死に出しの入力で、いま再生中なら、それは死に出しの再生
+      if (previousTurn?.kind === 'awaitReplacement' && isPlaying(state)) {
+        sawReplacementPlayback = true;
+      }
+      if (!isPlaying(state)) previousTurn = state.turn;
+    });
+
+    expect(sawReplacementPlayback).toBe(true);
+  });
+
+  it('決着のターンも最後まで再生してから結果画面へ行く', () => {
+    let lastBattleState: FlowState | null = null;
+    const final = playOut(toBattle('ai'), (state) => {
+      lastBattleState = state;
+    });
+
+    expect(final.screen.kind).toBe('result');
+    // バトル画面の最後の状態は再生中だった = 決着の様子を見せてから遷移している
+    expect(lastBattleState).not.toBeNull();
   });
 });
 

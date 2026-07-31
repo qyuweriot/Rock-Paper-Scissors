@@ -1,36 +1,36 @@
 /**
- * バトル画面 (PLAN §284)。
+ * バトル画面 (PLAN §284)。対面ステージ + 行動選択 + ログ。
  *
- * 場の2体・HPバー・毒スタック・設置枚数・修正値・行動選択・ログを1画面に出す。
- * **盤面情報は両者に公開してよい** (SPEC §11)。隠すのは相手の控えの中身だけ。
+ * **盤面は必ず flow.ts の表示用の派生から取る。** 再生中は組み直したコマを見せ、
+ * 再生が終わればエンジンの権威ある状態に戻る。
+ * ただし**合法手だけは権威ある状態から引く** (`legalActionsFor`)。
  */
 
 import { getUnit, type UnitId } from '../../data/units';
-import type { BattleState, Side } from '../../engine/types';
+import type { Action, BattleState, Side } from '../../engine/types';
 import { ActionPanel } from '../components/ActionPanel';
 import { BattleLog } from '../components/BattleLog';
-import { HazardBadge } from '../components/StatusBadges';
-import { UnitCard } from '../components/UnitCard';
+import { BattleStage } from '../components/BattleStage';
 import {
   activeInputSide,
+  currentFrame,
+  displayLog,
+  isPlaying,
   isUnitVisible,
   legalActionsFor,
   replacementOptions,
   type FlowState,
 } from '../flow';
-import type { Action } from '../../engine/types';
+import { effectOf } from '../playback';
 
 interface Props {
   state: FlowState;
+  /** 表示用の盤面。再生中はコマ、そうでなければ権威ある状態 */
   battle: BattleState;
   labels: Record<Side, string>;
   onDeclareAction: (action: Action) => void;
   onDeclareReplacement: (partyIndex: number) => void;
-}
-
-function unitIdAt(battle: BattleState, side: Side, partyIndex: number): UnitId | null {
-  const unit = battle.sides[side].party[partyIndex];
-  return unit ? (unit.unitId as UnitId) : null;
+  onSkipPlayback: () => void;
 }
 
 export function BattleScreen({
@@ -39,66 +39,50 @@ export function BattleScreen({
   labels,
   onDeclareAction,
   onDeclareReplacement,
+  onSkipPlayback,
 }: Props) {
   const viewer = activeInputSide(state);
   const turn = state.turn;
+  const frame = currentFrame(state);
+  const playing = isPlaying(state);
+  const effect = frame ? effectOf(frame) : null;
 
   return (
     <div className="screen screen--battle">
-      <div className="field">
-        {(['p2', 'p1'] as Side[]).map((side) => {
-          const sideState = battle.sides[side];
-          const activeIndex = sideState.activeIndex;
-          const activeId = unitIdAt(battle, side, activeIndex);
-          const activeUnit = sideState.party[activeIndex];
+      <header className="battle-head">
+        <span className="battle-head__turn">{battle.turn} ターン目</span>
+        {playing && (
+          <button type="button" className="btn btn--skip" onClick={onSkipPlayback}>
+            スキップ ▸▸
+          </button>
+        )}
+      </header>
 
-          return (
-            <section key={side} className={`field__side field__side--${side}`}>
-              <div className="field__head">
-                <h3>{labels[side]}</h3>
-                <HazardBadge stacks={sideState.hazardStacks} />
-              </div>
+      <BattleStage
+        battle={battle}
+        labels={labels}
+        effect={effect}
+        effectKey={state.playback?.index ?? -1}
+        isVisible={(side, partyIndex) => isUnitVisible(state, side, partyIndex, viewer)}
+        caption={playing ? (frame?.entry.text ?? null) : null}
+      />
 
-              {activeId && activeUnit && (
-                <UnitCard unitId={activeId} state={activeUnit} />
-              )}
-
-              <ul className="bench">
-                {sideState.party.map((unit, index) => {
-                  if (index === activeIndex) return null;
-                  const id = unitIdAt(battle, side, index);
-                  const visible = isUnitVisible(state, side, index, viewer);
-                  if (!id) return null;
-                  return (
-                    <li key={index} className={`bench__item ${unit.fainted ? 'is-fainted' : ''}`}>
-                      {visible ? (
-                        <>
-                          <span className="bench__name">{getUnit(id).name}</span>
-                          <span className="bench__hp">
-                            {unit.fainted ? '瀕死' : `HP ${unit.hp} / ${getUnit(id).maxHp}`}
-                          </span>
-                          {unit.poisonStacks > 0 && (
-                            <span className="bench__poison">毒{unit.poisonStacks}</span>
-                          )}
-                        </>
-                      ) : (
-                        <span className="bench__name bench__name--hidden">? ? ?</span>
-                      )}
-                    </li>
-                  );
-                })}
-              </ul>
-            </section>
-          );
-        })}
-      </div>
+      {/* 再生中は画面全体がスキップ用の当たり判定になる */}
+      {playing && (
+        <button
+          type="button"
+          className="playback-skip-layer"
+          aria-label="再生をスキップ"
+          onClick={onSkipPlayback}
+        />
+      )}
 
       <div className="panel">
-        {turn?.kind === 'awaitAction' && (
+        {!playing && turn?.kind === 'awaitAction' && (
           <>
             <p className="panel__prompt">{labels[turn.side]} の行動を選んでください</p>
             <ActionPanel
-              battle={battle}
+              battle={state.battle ?? battle}
               side={turn.side}
               actions={legalActionsFor(state, turn.side)}
               onDeclare={onDeclareAction}
@@ -106,15 +90,14 @@ export function BattleScreen({
           </>
         )}
 
-        {turn?.kind === 'awaitReplacement' && (
+        {!playing && turn?.kind === 'awaitReplacement' && (
           <>
             <p className="panel__prompt">{labels[turn.side]} の交代先を選んでください</p>
             <div className="actions__grid">
               {replacementOptions(state, turn.side).map((index) => {
-                const id = unitIdAt(battle, turn.side, index);
-                const unit = battle.sides[turn.side].party[index];
-                if (!id || !unit) return null;
-                const def = getUnit(id);
+                const unit = (state.battle ?? battle).sides[turn.side].party[index];
+                if (!unit) return null;
+                const def = getUnit(unit.unitId as UnitId);
                 return (
                   <button
                     key={index}
@@ -134,7 +117,7 @@ export function BattleScreen({
         )}
       </div>
 
-      <BattleLog entries={state.log} />
+      <BattleLog entries={displayLog(state)} />
     </div>
   );
 }
