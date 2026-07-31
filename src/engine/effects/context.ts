@@ -26,9 +26,9 @@ export interface EffectApi {
 
   damage(target: UnitRef, amount: number, source: DamageSource): void;
   heal(target: UnitRef, amount: number): void;
-  /** 毒を1スタック付与。2重が上限で、超過分は無効 (SPEC §7.1) */
+  /** 毒を1スタック付与。POISON_MAX_STACKS が上限で、超過分は無効 (SPEC §7.1) */
   applyPoison(target: UnitRef): void;
-  /** 指定した陣営の場に設置を1枚追加。2枚が上限 (SPEC §7.2) */
+  /** 指定した陣営の場に設置を1枚追加。HAZARD_MAX_STACKS が上限 (SPEC §7.2) */
   addHazard(side: Side): void;
   /** 交代を予約。`to` を省略すると解決時にランダムで選ばれる(団扇) */
   requestSwitch(side: Side, reason: 'forced' | 'selfSwitch', to?: number): void;
@@ -88,8 +88,16 @@ export interface HealContext extends HookContext {
   amount: number;
 }
 
-export interface KillContext extends HookContext {
+export interface RecoilContext extends HookContext {
+  /** 攻撃した相手 */
   victim: UnitRef;
+  /** データ上の反動量 */
+  recoil: number;
+  /**
+   * **自分の攻撃で**倒したか (SPEC §10.1)。
+   * 相手が自分の反動で自滅した場合や、反射で落ちた場合は false。
+   */
+  killed: boolean;
 }
 
 /**
@@ -105,8 +113,8 @@ export interface EffectHooks {
   onAfterDamageTaken?: (ctx: DamageTakenContext) => void;
   /** 相手側の回復量を書き換える。ハサミムシの回復無効 (SPEC §10.6) */
   onModifyHeal?: (ctx: HealContext) => number;
-  /** 相手を撃破した。粉砕の全回復 (SPEC §10.1) */
-  onKill?: (ctx: KillContext) => void;
+  /** 自分が受ける反動を書き換える。粉砕の反動無効 (SPEC §10.1) */
+  onModifyRecoil?: (ctx: RecoilContext) => number;
   /** 瀕死になった。ゴーストの反射。死因を問わない (SPEC §10.12) */
   onFaint?: (ctx: HookContext) => void;
   /** ターン終了時。毒の処理より後に呼ばれる。堅牢の回復 (SPEC §5.6 / §10.4) */

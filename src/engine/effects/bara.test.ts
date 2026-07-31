@@ -12,11 +12,16 @@ import {
   switchTo,
   unit,
 } from '../testkit';
-import { HAZARD_MAX_STACKS, POISON_MAX_STACKS } from '../constants';
+import {
+  HAZARD_DAMAGE,
+  HAZARD_MAX_STACKS,
+  POISON_DAMAGE,
+  POISON_MAX_STACKS,
+} from '../constants';
 import type { Action } from '../types';
 
 /**
- * バラ choki HP50 中 / 技0 毒撒き / 技1 棘撒き (SPEC §10.8)
+ * バラ choki HP80 中 / 技0 毒撒き / 技1 棘撒き (SPEC §10.8)
  * どちらもダメージを与えない。
  */
 describe('バラ — 毒撒き (SPEC §10.8 / §7.1)', () => {
@@ -28,17 +33,20 @@ describe('バラ — 毒撒き (SPEC §10.8 / §7.1)', () => {
     expect(active(after, 'p2').poisonStacks).toBe(1);
   });
 
-  it('2重まで重なり、3重目は無効だがターンは消費する', () => {
+  it('上限まで重なり、それ以降は無効だがターンは消費する', () => {
+    // 上限は POISON_MAX_STACKS。定数から導くので、上限を変えてもこのテストは追従する
     let state = makeBattle(['bara'], [INERT]);
-    state = resolveTurn(state, { p1: move(0), p2: inert() }).state;
-    state = resolveTurn(state, { p1: move(0), p2: inert() }).state;
+    for (let i = 0; i < POISON_MAX_STACKS; i++) {
+      state = resolveTurn(state, { p1: move(0), p2: inert() }).state;
+    }
     expect(active(state, 'p2').poisonStacks).toBe(POISON_MAX_STACKS);
 
-    const third = resolveTurn(state, { p1: move(0), p2: inert() });
-    expect(active(third.state, 'p2').poisonStacks).toBe(POISON_MAX_STACKS);
-    expect(eventsOfType(third.events, 'poisonApplied')).toHaveLength(0);
-    expect(eventsOfType(third.events, 'noEffect').some((e) => e.reason.includes('毒'))).toBe(true);
-    expect(third.state.turn).toBe(4); // ターンは進む
+    const turnBefore = state.turn;
+    const excess = resolveTurn(state, { p1: move(0), p2: inert() });
+    expect(active(excess.state, 'p2').poisonStacks).toBe(POISON_MAX_STACKS);
+    expect(eventsOfType(excess.events, 'poisonApplied')).toHaveLength(0);
+    expect(eventsOfType(excess.events, 'noEffect').some((e) => e.reason.includes('毒'))).toBe(true);
+    expect(excess.state.turn).toBe(turnBefore + 1); // ターンは進む
   });
 
   it('毒は交代しても維持される (SPEC §7.1)', () => {
@@ -58,13 +66,16 @@ describe('バラ — 毒撒き (SPEC §10.8 / §7.1)', () => {
     expect(unit(back, 'p2', 0).poisonStacks).toBe(1);
   });
 
-  it('毒はターン終了時に10ダメージを与え、2重なら20', () => {
-    const state = makeBattle(['bara'], [INERT]);
-    setPoison(state, 'p2', 0, 2);
+  it('毒はターン終了時に スタック数 × 10 のダメージを与える', () => {
+    for (const stacks of [1, POISON_MAX_STACKS]) {
+      const state = makeBattle(['bara'], [INERT]);
+      setPoison(state, 'p2', 0, stacks);
 
-    const { events } = resolveTurn(state, { p1: move(0), p2: inert() });
-    const poison = eventsOfType(events, 'damage').find((d) => d.source === 'poison');
-    expect(poison?.amount).toBe(20);
+      // 毒撒き(技0)を使うとこのターンに1スタック増えてしまうので、棘撒き(技1)を使う
+      const { events } = resolveTurn(state, { p1: move(1), p2: inert() });
+      const poison = eventsOfType(events, 'damage').find((d) => d.source === 'poison');
+      expect(poison?.amount).toBe(POISON_DAMAGE * stacks);
+    }
   });
 });
 
@@ -78,27 +89,28 @@ describe('バラ — 棘撒き (SPEC §10.8 / §7.2)', () => {
     expect(after.sides.p1.hazardStacks).toBe(0); // 自陣には置かれない
   });
 
-  it('2枚まで置け、3枚目は無効だがターンは消費する', () => {
+  it('上限まで置け、それ以降は無効だがターンは消費する', () => {
     let state = makeBattle(['bara'], [INERT]);
-    state = resolveTurn(state, { p1: move(1), p2: inert() }).state;
-    state = resolveTurn(state, { p1: move(1), p2: inert() }).state;
+    for (let i = 0; i < HAZARD_MAX_STACKS; i++) {
+      state = resolveTurn(state, { p1: move(1), p2: inert() }).state;
+    }
     expect(state.sides.p2.hazardStacks).toBe(HAZARD_MAX_STACKS);
 
-    const third = resolveTurn(state, { p1: move(1), p2: inert() });
-    expect(third.state.sides.p2.hazardStacks).toBe(HAZARD_MAX_STACKS);
-    expect(eventsOfType(third.events, 'hazardSet')).toHaveLength(0);
-    expect(eventsOfType(third.events, 'noEffect').some((e) => e.reason.includes('設置'))).toBe(
+    const excess = resolveTurn(state, { p1: move(1), p2: inert() });
+    expect(excess.state.sides.p2.hazardStacks).toBe(HAZARD_MAX_STACKS);
+    expect(eventsOfType(excess.events, 'hazardSet')).toHaveLength(0);
+    expect(eventsOfType(excess.events, 'noEffect').some((e) => e.reason.includes('設置'))).toBe(
       true,
     );
   });
 
-  it('設置は相手が場に出るたびに発動する', () => {
+  it('設置は相手が場に出るたびに 枚数 × 10 のダメージを与える', () => {
     const state = makeBattle(['bara'], [INERT, 'ishi']);
-    setHazard(state, 'p2', 2);
+    setHazard(state, 'p2', HAZARD_MAX_STACKS);
 
     const { events } = resolveTurn(state, { p1: move(1), p2: switchTo(1) });
     const hazard = eventsOfType(events, 'damage').find((d) => d.source === 'hazard');
-    expect(hazard?.amount).toBe(20);
+    expect(hazard?.amount).toBe(HAZARD_DAMAGE * HAZARD_MAX_STACKS);
     expect(hazard?.target).toEqual({ side: 'p2', partyIndex: 1 });
   });
 

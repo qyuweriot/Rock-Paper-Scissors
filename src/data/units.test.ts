@@ -10,21 +10,21 @@ import type { Attribute, Speed, UnitDef } from '../engine/types';
  */
 const SPEC_TABLE: [id: string, name: string, attribute: Attribute, hp: number, speed: Speed][] = [
   // グー
-  ['funsai', '粉砕', 'gu', 50, 'slow'],
+  ['funsai', '粉砕', 'gu', 60, 'slow'],
   ['tekken', '鉄拳', 'gu', 50, 'mid'],
   ['magyu', '魔球', 'gu', 100, 'mid'],
   ['kenro', '堅牢', 'gu', 140, 'slow'],
   ['ishi', '石', 'gu', 105, 'mid'],
   // チョキ
   ['hasamimushi', 'ハサミムシ', 'choki', 120, 'fast'],
-  ['yamaarashi', '山嵐', 'choki', 100, 'mid'],
-  ['bara', 'バラ', 'choki', 50, 'mid'],
+  ['yamaarashi', '山嵐', 'choki', 90, 'mid'],
+  ['bara', 'バラ', 'choki', 80, 'mid'],
   ['issen', '一閃', 'choki', 40, 'fast'],
   ['hasami', 'はさみ', 'choki', 95, 'fast'],
   // パー
   ['tenohira', '手のひら', 'pa', 100, 'mid'],
   ['ghost', 'ゴースト', 'pa', 60, 'fast'],
-  ['utsuwa', '器', 'pa', 110, 'mid'],
+  ['utsuwa', '器', 'pa', 130, 'mid'],
   ['uchiwa', '団扇', 'pa', 80, 'slow'],
   ['kami', '紙', 'pa', 100, 'mid'],
 ];
@@ -125,7 +125,7 @@ describe('個別仕様の反映 (SPEC §10)', () => {
     expect(firstMoves.sort()).toEqual(['kami:1', 'tekken:0']);
   });
 
-  it('反動を持つのは粉砕50 / 石15 / ゴースト5 だけ (SPEC §4.2)', () => {
+  it('反動を持つのは粉砕35 / 石15 / ゴースト5 だけ (SPEC §4.2)', () => {
     const recoils: [string, number][] = [];
     for (const unit of UNIT_LIST) {
       for (const slot of unit.slots) {
@@ -135,7 +135,7 @@ describe('個別仕様の反映 (SPEC §10)', () => {
       }
     }
     expect(recoils.sort()).toEqual([
-      ['funsai', 50],
+      ['funsai', 35],
       ['ghost', 5],
       ['ishi', 15],
     ]);

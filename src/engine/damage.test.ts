@@ -138,25 +138,37 @@ describe('実データとの突き合わせ', () => {
     }
   });
 
-  it('粉砕は有利対面70 / 不利対面35 (SPEC §10.1)', () => {
-    const smash = getMove(UNITS.funsai, 0); // 威力45
+  it('粉砕は有利対面85 / 互角60 / 不利対面50 (SPEC §10.1)', () => {
+    const smash = getMove(UNITS.funsai, 0); // 威力60
 
-    expect(dmg(smash.damage, 'gu', 'choki')).toBe(70);
-    expect(dmg(smash.damage, 'gu', 'pa')).toBe(35);
+    expect(dmg(smash.damage, 'gu', 'choki')).toBe(85);
+    expect(dmg(smash.damage, 'gu', 'gu')).toBe(60);
+    expect(dmg(smash.damage, 'gu', 'pa')).toBe(50);
   });
 
-  it('粉砕は威力が反動を下回るため、互角のHP50 を一撃で倒せない (SPEC §10.1)', () => {
+  it('粉砕は互角で自分と同じHPを一撃で倒せる。ミラーは相打ちの引き分けになる (SPEC §10.1)', () => {
     const smash = getMove(UNITS.funsai, 0);
     const neutral = dmg(smash.damage, 'gu', 'gu');
 
-    expect(neutral).toBe(45);
-    expect(neutral).toBeLessThan(UNITS.funsai.maxHp); // ミラーでは倒しきれない
-    expect(smash.recoil).toBeGreaterThan(neutral);
+    expect(neutral).toBeGreaterThanOrEqual(UNITS.funsai.maxHp);
   });
 
-  it('粉砕は反動50。撃破に失敗すればHP50を削り切って自滅する (SPEC §10.1)', () => {
+  it('粉砕は反動35。撃破に失敗しても即死はせず、2回目で自滅する (SPEC §10.1)', () => {
     const smash = getMove(UNITS.funsai, 0);
-    expect(smash.recoil).toBe(50);
-    expect(UNITS.funsai.maxHp).toBe(50);
+    const recoil = smash.recoil ?? 0;
+
+    expect(recoil).toBe(35);
+    expect(UNITS.funsai.maxHp).toBe(60);
+    // 満タンから1回は耐える (60 → 25)、2回目で落ちる
+    expect(UNITS.funsai.maxHp - recoil).toBeGreaterThan(0);
+    expect(UNITS.funsai.maxHp - recoil * 2).toBeLessThanOrEqual(0);
+  });
+
+  it('ゴーストは威力15。有利対面40 / 互角15 (SPEC §9)', () => {
+    const curse = getMove(UNITS.ghost, 0);
+
+    expect(dmg(curse.damage, 'pa', 'gu')).toBe(40);
+    expect(dmg(curse.damage, 'pa', 'pa')).toBe(15);
+    expect(curse.recoil).toBe(5);
   });
 });

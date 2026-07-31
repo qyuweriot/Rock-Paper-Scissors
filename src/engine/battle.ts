@@ -382,7 +382,10 @@ function flushStatuses(state: BattleState, queue: BandQueue, events: BattleEvent
     if (entry.kind === 'poison') {
       const unit = unitAt(state, entry.target);
       if (unit.poisonStacks >= POISON_MAX_STACKS) {
-        events.push({ type: 'noEffect', reason: '毒は既に2重で、これ以上重ならない' });
+        events.push({
+          type: 'noEffect',
+          reason: `毒は既に${String(POISON_MAX_STACKS)}重で、これ以上重ならない`,
+        });
         continue;
       }
       unit.poisonStacks += 1;
@@ -390,7 +393,10 @@ function flushStatuses(state: BattleState, queue: BandQueue, events: BattleEvent
     } else {
       const sideState = state.sides[entry.side];
       if (sideState.hazardStacks >= HAZARD_MAX_STACKS) {
-        events.push({ type: 'noEffect', reason: '設置は既に2枚で、これ以上置けない' });
+        events.push({
+          type: 'noEffect',
+          reason: `設置は既に${String(HAZARD_MAX_STACKS)}枚で、これ以上置けない`,
+        });
         continue;
       }
       sideState.hazardStacks += 1;
@@ -566,9 +572,8 @@ interface PendingHit {
  *
  * **瀕死処理を後ろにずらしてある。** SPEC §5.4 は「HPの変化があるたびに瀕死判定」と
  * するが、§10.1 は粉砕について
- *   相手にダメージ → 反動 → 相手の瀕死判定 → 撃破なら全回復 → 自分の瀕死判定
- * という順序を明示し、「同段で相手の攻撃も受けており、かつ撃破成功 → 全回復により
- * 生存する」と帰結を定めている。HP変動のたびに瀕死処理をすると粉砕は必ず自滅するため、
+ *   相手にダメージ → 相手の瀕死判定 → 倒していれば反動を無効化 → 自分の瀕死判定
+ * という順序を明示している。撃破の成否が反動より先に決まっていないと成り立たないため、
  * より具体的な §10.1 を優先し、HPの増減をすべて済ませてから瀕死処理する。
  */
 function resolveBand(
@@ -696,32 +701,31 @@ function resolveBand(
   /**
    * 「自分の攻撃で倒したか」を、反動と反射が入る前に確定させる。
    *
-   * 特性の条件は「**相手を倒した場合**」(SPEC §9)。相手が自分の反動で自滅したり、
+   * 特性の条件は「**相手を倒した場合**」(SPEC §10.1)。相手が自分の反動で自滅したり、
    * 反射で落ちたりした場合は撃破に含めない。ここで判定せず後段の HP だけを見ると、
-   * 粉砕ミラーで互いに「相手が(自分の反動で)倒れた」と誤認して双方が全回復し、
-   * 決着しなくなる。
+   * 粉砕ミラーで互いに「相手が(自分の反動で)倒れた」と誤認する。
    */
   const killedByAttack = hits.map(
     (hit) => hit.amount !== null && unitAt(state, hit.target).hp <= 0,
   );
 
-  for (const hit of hits) {
-    if (hit.amount !== null && hit.recoil > 0) {
-      dealDamage(state, hit.attacker, hit.recoil, 'recoil', events);
-    }
-  }
-  flushDamages(state, queue, events); // 山嵐の反射
-
-  // 撃破時の特性。まだ瀕死処理をしていないので、粉砕は全回復に間に合う (SPEC §10.1)
+  // 反動。撃破の成否が決まった後に適用するので、粉砕は無効化に間に合う (SPEC §10.1)
   hits.forEach((hit, index) => {
-    if (!killedByAttack[index]) return;
-    abilityHooks(state, hit.attacker)?.onKill?.({
-      api,
-      self: hit.attacker,
-      victim: hit.target,
-    });
+    if (hit.amount === null) return;
+    const onModifyRecoil = abilityHooks(state, hit.attacker)?.onModifyRecoil;
+    const recoil = onModifyRecoil
+      ? onModifyRecoil({
+          api,
+          self: hit.attacker,
+          victim: hit.target,
+          recoil: hit.recoil,
+          killed: killedByAttack[index] ?? false,
+        })
+      : hit.recoil;
+    if (recoil > 0) dealDamage(state, hit.attacker, recoil, 'recoil', events);
   });
-  flushHeals(state, queue, api, events);
+
+  flushDamages(state, queue, events); // 山嵐の反射
 
   processFaints(state, queue, api, events);
   flushStatuses(state, queue, events);

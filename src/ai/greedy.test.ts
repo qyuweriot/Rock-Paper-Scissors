@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createGreedyAi, switchBonus } from './greedy';
 import { SWITCH_DISADVANTAGE_BONUS } from './constants';
+import { POISON_MAX_STACKS } from '../engine/constants';
 import { getLegalActions } from '../engine/battle';
 import { makeBattle, move, setHp, setPoison, switchTo, unit } from '../engine/testkit';
 
@@ -62,9 +63,9 @@ describe('createGreedyAi — Lv2', () => {
     expect(ai.chooseAction(state, 'p1')).toEqual(move(0));
   });
 
-  it('毒が2重で無駄になるなら設置に切り替える (SPEC §10.8)', () => {
+  it('毒が上限に達して無駄になるなら設置に切り替える (SPEC §10.8)', () => {
     const state = makeBattle(['bara'], ['kenro']);
-    setPoison(state, 'p2', 0, 2);
+    setPoison(state, 'p2', 0, POISON_MAX_STACKS);
     expect(ai.chooseAction(state, 'p1')).toEqual(move(1));
   });
 

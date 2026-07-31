@@ -1,18 +1,19 @@
 import { describe, expect, it } from 'vitest';
 import { resolveReplacements, resolveTurn } from '../battle';
-import { active, eventsOfType, makeBattle, move, setHp } from '../testkit';
+import { funsaiFortitude } from './funsai';
+import { active, eventsOfType, inert, INERT, makeBattle, move, setHp } from '../testkit';
 
 /**
- * 粉砕 gu HP50 遅 / 技0 威力45 + 自分に固定50の反動 / 特性「撃破再生」(SPEC §10.1)
+ * 粉砕 gu HP60 遅 / 技0 威力60 + 自分に固定35の反動 / 特性「不撓」(SPEC §10.1)
  *
- * PLAN §218-225 が必須と定める4ケースをここで固定する。
- * 処理順を間違えると「常に自滅」か「常に生存」のどちらかに倒れるため、
- * 4つが同時に通ることが正しさの証拠になる。
+ * PLAN §218-225 が必須と定める処理順のケースをここで固定する。
+ * 撃破判定を反動の前後どちらに置くかで「常に自滅」か「常に無傷」に倒れるため、
+ * これらが同時に通ることが正しさの証拠になる。
  */
-describe('粉砕 — 撃破再生 (SPEC §10.1)', () => {
-  it('有利対面で相手を撃破 → HP全回復して生存する', () => {
-    // バラ choki HP50。グー→チョキ は有利 (45+25=70) なので一撃で落ちる。
-    // バラの技1(棘撒き)は p1 側に設置を置くだけで、このターンは何も起こさない
+describe('粉砕 — 不撓 (SPEC §10.1)', () => {
+  it('撃破成功 → 反動を受けない', () => {
+    // バラ choki HP80。グー→チョキ は有利 (60+25=85) なので一撃で落ちる。
+    // バラの技2(棘撒き)は p1 側に設置を置くだけで、このターンは何も起こさない
     const state = makeBattle(['funsai'], ['bara']);
 
     const { state: after, events } = resolveTurn(state, { p1: move(0), p2: move(1) });
@@ -20,76 +21,120 @@ describe('粉砕 — 撃破再生 (SPEC §10.1)', () => {
     expect(eventsOfType(events, 'faint')).toHaveLength(1);
     expect(eventsOfType(events, 'faint')[0]?.target.side).toBe('p2');
     expect(active(after, 'p1').fainted).toBe(false);
-    expect(active(after, 'p1').hp).toBe(50); // 反動50を受けたが全回復した
+    expect(active(after, 'p1').hp).toBe(60);
+    // 反動そのものが発生していない。0ダメージのイベントすら出ない
+    expect(eventsOfType(events, 'damage').filter((d) => d.source === 'recoil')).toHaveLength(0);
   });
 
-  it('撃破できなかった → 反動50で自滅する', () => {
-    // 堅牢 gu HP140。互角なので45ダメージでは落ちない
-    const state = makeBattle(['funsai'], ['kenro']);
+  it('撃破失敗 → 反動35を受けるが、1回なら耐える', () => {
+    // 器 pa HP130 は不利対面 (60−10=50) なので落とせない。
+    // 控えがいないので器の技2は空振りし、粉砕は反動以外のダメージを受けない
+    const state = makeBattle(['funsai'], [INERT]);
 
-    const { state: after, events } = resolveTurn(state, { p1: move(0), p2: move(0) });
+    const { state: after, events } = resolveTurn(state, { p1: move(0), p2: inert() });
 
-    expect(active(after, 'p2').fainted).toBe(false);
+    const recoils = eventsOfType(events, 'damage').filter((d) => d.source === 'recoil');
+    expect(recoils).toHaveLength(1);
+    expect(recoils[0]?.amount).toBe(35);
+    expect(active(after, 'p1').fainted).toBe(false);
+    expect(active(after, 'p1').hp).toBe(25); // 60 − 35
+  });
+
+  it('撃破失敗が2回続く → 反動で自滅する', () => {
+    let state = makeBattle(['funsai'], [INERT]);
+
+    state = resolveTurn(state, { p1: move(0), p2: inert() }).state;
+    expect(active(state, 'p1').hp).toBe(25);
+
+    const { state: after } = resolveTurn(state, { p1: move(0), p2: inert() });
+
     expect(after.sides.p1.party[0]?.fainted).toBe(true);
-    // 堅牢は自分の特性で回復するので、粉砕側に回復が入っていないことを見る
-    expect(eventsOfType(events, 'heal').filter((h) => h.target.side === 'p1')).toHaveLength(0);
+    expect(after.phase).toEqual({ kind: 'ended', result: 'p2' });
   });
 
-  it('同段で相手の攻撃も受け、かつ撃破成功 → 全回復により生存する', () => {
-    // 団扇 pa HP80 遅。粉砕と同じ「遅」なので同段になる
-    const state = makeBattle(['funsai'], ['uchiwa']);
-    setHp(state, 'p2', 0, 35); // グー→パー は不利 (45−10=35) でちょうど落ちる
+  it('同段で相手の攻撃も受け、かつ撃破成功 → 反動は無効だが被弾分は残る', () => {
+    // 堅牢 gu HP140 遅。粉砕と同じ「遅」なので同段になる
+    const state = makeBattle(['funsai'], ['kenro']);
+    setHp(state, 'p2', 0, 60); // 互角の60 でちょうど落ちる
 
     const { state: after, events } = resolveTurn(state, { p1: move(0), p2: move(0) });
-
-    // 団扇の攻撃50(パー→グー有利)と反動50の両方を受けている
-    const taken = eventsOfType(events, 'damage').filter((d) => d.target.side === 'p1');
-    expect(taken.map((d) => d.source).sort()).toEqual(['move', 'recoil']);
 
     expect(active(after, 'p2').fainted).toBe(true);
     expect(active(after, 'p1').fainted).toBe(false);
-    expect(active(after, 'p1').hp).toBe(50);
+    // 堅牢の重打15 は受けている。反動35 は受けていない
+    expect(active(after, 'p1').hp).toBe(45);
+    expect(eventsOfType(events, 'damage').filter((d) => d.source === 'recoil')).toHaveLength(0);
   });
 
-  it('相手がハサミムシの場合 → 全回復が無効化され、撃破成功でも自滅する', () => {
-    // ハサミムシ choki。有利対面だが HP120 なので落とせる量まで下げる
+  it('相手がハサミムシでも反動無効は効く。回復ではないため治癒封じで止まらない (SPEC §10.6)', () => {
     const state = makeBattle(['funsai'], ['hasamimushi']);
-    setHp(state, 'p2', 0, 50); // 70 ダメージで落ちる
+    setHp(state, 'p2', 0, 85); // 有利対面の85 でちょうど落ちる
 
     const { state: after, events } = resolveTurn(state, { p1: move(0), p2: move(0) });
 
-    expect(after.sides.p2.party[0]?.fainted).toBe(true); // 撃破は成功している
-    expect(after.sides.p1.party[0]?.fainted).toBe(true); // それでも自滅する
-    expect(eventsOfType(events, 'healBlocked')).toHaveLength(1);
-    expect(after.phase).toEqual({ kind: 'ended', result: 'draw' });
+    expect(after.sides.p2.party[0]?.fainted).toBe(true);
+    expect(after.sides.p1.party[0]?.fainted).toBe(false);
+    // ハサミムシの連撃5(不利補正)だけを受けている
+    expect(active(after, 'p1').hp).toBe(55);
+    // 回復の仕組みを通っていないので、封じられる余地がない
+    expect(eventsOfType(events, 'healBlocked')).toHaveLength(0);
+    expect(eventsOfType(events, 'heal')).toHaveLength(0);
   });
 
-  it('相手が自分の反動で自滅した場合は撃破に含めない', () => {
-    // 粉砕ミラー。互角で威力45 なので HP50 を削りきれず、双方が反動50 で自滅する。
-    // ここで「相手が倒れた」だけを見て全回復すると、双方が生き残って永久に決着しない
+  it('ミラーは相打ちの引き分けになる。永久に決着しない状態は生じない', () => {
+    // 互角で威力60。HP60 をちょうど削りきるので双方が同時に倒れる
     const { state: after, events } = resolveTurn(makeBattle(['funsai'], ['funsai']), {
       p1: move(0),
       p2: move(0),
     });
 
-    expect(eventsOfType(events, 'heal')).toHaveLength(0);
+    expect(eventsOfType(events, 'faint')).toHaveLength(2);
     expect(after.phase).toEqual({ kind: 'ended', result: 'draw' });
   });
 
-  it('有利対面で倒し続ける限り無限に殴れる (SPEC §10.1 の帰結)', () => {
-    // チョキ3体。いずれも 70 ダメージ (45 + 有利25) で一撃圏内
-    let state = makeBattle(['funsai'], ['issen', 'bara', 'hasami']);
-    // はさみは技1で守勢+10 を張るため、粉砕の一撃は 70 ではなく 60 になる
-    setHp(state, 'p2', 2, 60);
+  it('有利対面で倒し続ける限り無傷で殴り続けられる (SPEC §10.1 の帰結)', () => {
+    // チョキ3体。相手はいずれもダメージを出さない技2を使う
+    const state0 = makeBattle(['funsai'], ['issen', 'bara', 'hasami']);
+    // はさみの技2は守勢+10 を張るので、粉砕の一撃は 85 ではなく 75 になる
+    setHp(state0, 'p2', 2, 70);
 
+    let state = state0;
     for (let i = 0; i < 3; i++) {
       state = resolveTurn(state, { p1: move(0), p2: move(1) }).state;
       if (state.phase.kind !== 'awaitingReplacement') break;
       state = resolveReplacements(state, { p2: i + 1 }).state;
     }
 
-    // 3体を撃破しきり、粉砕は毎回全回復して満タンのまま生き残る
     expect(state.phase).toEqual({ kind: 'ended', result: 'p1' });
-    expect(state.sides.p1.party[0]?.hp).toBe(50);
+    expect(state.sides.p1.party[0]?.hp).toBe(60); // 一度も削られていない
+  });
+
+  /**
+   * 「倒した」は**自分の攻撃で**倒した場合を指す (SPEC §10.1)。
+   *
+   * 現在のデータでは、粉砕と同段(遅)に反動持ちが他にいないため
+   * 「相手が自分の反動で自滅した」状況を盤面から作れない。
+   * ルール自体はフックの水準で固定しておく。
+   */
+  describe('反動無効の条件', () => {
+    const call = (recoil: number, killed: boolean): number => {
+      const onModifyRecoil = funsaiFortitude.onModifyRecoil;
+      if (!onModifyRecoil) throw new Error('onModifyRecoil が定義されていません');
+      return onModifyRecoil({
+        api: null as never,
+        self: { side: 'p1', partyIndex: 0 },
+        victim: { side: 'p2', partyIndex: 0 },
+        recoil,
+        killed,
+      });
+    };
+
+    it('倒したなら反動は0になる', () => {
+      expect(call(35, true)).toBe(0);
+    });
+
+    it('倒していなければ反動はそのまま', () => {
+      expect(call(35, false)).toBe(35);
+    });
   });
 });

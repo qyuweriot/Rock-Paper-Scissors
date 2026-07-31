@@ -48,6 +48,23 @@ export function setHazard(state: BattleState, side: Side, stacks: number): void 
   state.sides[side].hazardStacks = stacks;
 }
 
+/**
+ * 修正値を直接仕込む (SPEC §4.3)。
+ *
+ * 現在のデータで守勢を上げられるのは はさみ の技2(自分にのみ)だけなので、
+ * 「相手の守勢が高い」状況は通常の手順では作れない。
+ * ダメージ下限0 の境界を試すために使う。
+ */
+export function setModifier(
+  state: BattleState,
+  side: Side,
+  partyIndex: number,
+  axis: 'atk' | 'def',
+  value: number,
+): void {
+  unit(state, side, partyIndex).modifiers[axis] = value;
+}
+
 export function unit(state: BattleState, side: Side, partyIndex: number) {
   const found = state.sides[side].party[partyIndex];
   if (!found) throw new Error(`存在しないユニット: ${side}[${String(partyIndex)}]`);

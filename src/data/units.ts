@@ -16,7 +16,7 @@ import { baraHazard, baraPoison } from '../engine/effects/bara';
 import { tenohiraRest } from '../engine/effects/tenohira';
 import { utsuwaDevotion } from '../engine/effects/utsuwa';
 import { TENOHIRA_HEAL_USES } from '../engine/constants';
-import { funsaiRegrowth } from '../engine/effects/funsai';
+import { funsaiFortitude } from '../engine/effects/funsai';
 import { ghostCurse } from '../engine/effects/ghost';
 import { hasamimushiGrowth, hasamimushiHealBlock } from '../engine/effects/hasamimushi';
 import { magyuDecay, magyuEscape } from '../engine/effects/magyu';
@@ -31,25 +31,25 @@ export const UNITS = {
     id: 'funsai',
     name: '粉砕',
     attribute: 'gu',
-    maxHp: 50,
+    maxHp: 60,
     speed: 'slow',
     slots: [
       {
         kind: 'move',
         move: {
           name: '粉砕撃',
-          text: '威力45。自分に固定50の反動。',
-          damage: { kind: 'normal', power: 45 },
+          text: '威力60。自分に固定35の反動。',
+          damage: { kind: 'normal', power: 60 },
           priority: 'normal',
-          recoil: 50,
+          recoil: 35,
         },
       },
       {
         kind: 'ability',
         ability: {
-          name: '撃破再生',
-          text: '相手を倒した場合、HPが全回復する。',
-          hooks: funsaiRegrowth,
+          name: '不撓',
+          text: '相手を倒した場合、この技の反動を受けない。',
+          hooks: funsaiFortitude,
         },
       },
     ],
@@ -205,7 +205,7 @@ export const UNITS = {
     id: 'yamaarashi',
     name: '山嵐',
     attribute: 'choki',
-    maxHp: 100,
+    maxHp: 90,
     speed: 'mid',
     slots: [
       {
@@ -232,14 +232,14 @@ export const UNITS = {
     id: 'bara',
     name: 'バラ',
     attribute: 'choki',
-    maxHp: 50,
+    maxHp: 80,
     speed: 'mid',
     slots: [
       {
         kind: 'move',
         move: {
           name: '毒撒き',
-          text: 'ダメージなし。相手に毒を1スタック付与(2重まで)。',
+          text: 'ダメージなし。相手に毒を1スタック付与(3重まで)。',
           damage: { kind: 'none' },
           priority: 'normal',
           hooks: baraPoison,
@@ -249,7 +249,7 @@ export const UNITS = {
         kind: 'move',
         move: {
           name: '棘撒き',
-          text: 'ダメージなし。相手側の場に設置を1枚追加(2枚まで)。',
+          text: 'ダメージなし。相手側の場に設置を1枚追加(3枚まで)。',
           damage: { kind: 'none' },
           priority: 'normal',
           hooks: baraHazard,
@@ -359,8 +359,8 @@ export const UNITS = {
         kind: 'move',
         move: {
           name: '呪い',
-          text: '威力10。自分に固定5の反動。',
-          damage: { kind: 'normal', power: 10 },
+          text: '威力15。自分に固定5の反動。',
+          damage: { kind: 'normal', power: 15 },
           priority: 'normal',
           recoil: 5,
         },
@@ -380,7 +380,7 @@ export const UNITS = {
     id: 'utsuwa',
     name: '器',
     attribute: 'pa',
-    maxHp: 110,
+    maxHp: 130,
     speed: 'mid',
     slots: [
       {

@@ -20,13 +20,13 @@ export const TYPE_DISADVANTAGE = -10;
 
 /** 毒1スタックあたりのターン終了時ダメージ */
 export const POISON_DAMAGE = 10;
-/** 毒の重複上限。3重目の付与は無効 */
-export const POISON_MAX_STACKS = 2;
+/** 毒の重複上限。4重目の付与は無効 */
+export const POISON_MAX_STACKS = 3;
 
 /** 設置1枚あたりの登場時ダメージ */
 export const HAZARD_DAMAGE = 10;
-/** 設置の重複上限。3枚目の設置は無効 */
-export const HAZARD_MAX_STACKS = 2;
+/** 設置の重複上限。4枚目の設置は無効 */
+export const HAZARD_MAX_STACKS = 3;
 
 // --- 修正値 (SPEC §4.3) -----------------------------------------------------
 

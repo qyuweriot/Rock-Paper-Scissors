@@ -8,13 +8,14 @@ import {
   move,
   setHazard,
   setHp,
+  setModifier,
   setPoison,
   switchTo,
 } from '../testkit';
 import { YAMAARASHI_REFLECT } from '../constants';
 
 /**
- * 山嵐 choki HP100 中 / 技0 威力20 / 特性「棘の反射」(SPEC §10.7)
+ * 山嵐 choki HP90 中 / 技0 威力20 / 特性「棘の反射」(SPEC §10.7)
  */
 const reflects = (events: ReturnType<typeof resolveTurn>['events']) =>
   eventsOfType(events, 'damage').filter((d) => d.source === 'reflect');
@@ -32,15 +33,18 @@ describe('山嵐 — 棘の反射 (SPEC §10.7)', () => {
   });
 
   it('ダメージが0でも、攻撃技を受けていれば反射する', () => {
-    // ゴースト pa 技0 威力10 → パー→チョキ 不利で 10−10 = 0
-    const state = makeBattle(['yamaarashi'], ['ghost']);
+    // 器 pa 技0 威力15 → パー→チョキ 不利で 5。守勢+10 を足して 0 に落とす。
+    // 現在のデータでは相手の守勢を上げる手段がないため、直接仕込んで境界を作る
+    const state = makeBattle(['yamaarashi'], ['utsuwa']);
+    setModifier(state, 'p1', 0, 'def', 10);
+
     const { events } = resolveTurn(state, { p1: move(0), p2: move(0) });
 
     const dealt = eventsOfType(events, 'damage').find(
       (d) => d.source === 'move' && d.target.side === 'p1',
     );
     expect(dealt?.amount).toBe(0);
-    // ゴーストは瀕死時に自分でも反射するので、山嵐が返した分だけを数える
+
     const toAttacker = reflects(events).filter((d) => d.target.side === 'p2');
     expect(toAttacker).toHaveLength(1);
     expect(toAttacker[0]?.amount).toBe(YAMAARASHI_REFLECT);
