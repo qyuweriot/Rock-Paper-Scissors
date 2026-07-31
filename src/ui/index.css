@@ -1,0 +1,44 @@
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family:
+    system-ui,
+    -apple-system,
+    'Hiragino Sans',
+    'Noto Sans JP',
+    sans-serif;
+  line-height: 1.6;
+  color: #e8e8ea;
+  background: #16161a;
+}
+
+.app {
+  max-width: 40rem;
+  margin: 0 auto;
+  padding: 3rem 1.5rem;
+}
+
+.app h1 {
+  margin: 0;
+  font-size: 2rem;
+}
+
+.lead {
+  margin: 0.25rem 0 2rem;
+  color: #9a9aa4;
+}
+
+.phase {
+  display: inline-block;
+  margin: 0;
+  padding: 0.35rem 0.75rem;
+  border: 1px solid #35353d;
+  border-radius: 999px;
+  font-size: 0.875rem;
+  color: #9a9aa4;
+}

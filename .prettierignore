@@ -1,0 +1,8 @@
+node_modules/
+dist/
+.npm-cache/
+coverage/
+package-lock.json
+
+# 手書きの仕様書。整形で差分ノイズを出さない
+docs/
