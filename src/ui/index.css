@@ -1,3 +1,24 @@
+/**
+ * じゃんけんバトルのスタイル。
+ * CSS Modules も CSS-in-JS も使わない(依存を増やさない)。
+ */
+
+:root {
+  --bg: #16161a;
+  --surface: #1e1e24;
+  --surface-2: #26262e;
+  --border: #35353d;
+  --text: #e8e8ea;
+  --muted: #9a9aa4;
+  --accent: #6ea8fe;
+  --gu: #e8845c;
+  --choki: #7fc8a9;
+  --pa: #9a8cf0;
+  --danger: #e05c5c;
+  --warn: #e0b25c;
+  --ok: #5cc98a;
+}
+
 *,
 *::before,
 *::after {
@@ -13,32 +34,646 @@ body {
     'Noto Sans JP',
     sans-serif;
   line-height: 1.6;
-  color: #e8e8ea;
-  background: #16161a;
+  color: var(--text);
+  background: var(--bg);
+}
+
+button {
+  font: inherit;
+  color: inherit;
 }
 
 .app {
-  max-width: 40rem;
+  max-width: 60rem;
   margin: 0 auto;
-  padding: 3rem 1.5rem;
+  padding: 1.5rem 1rem 4rem;
 }
 
-.app h1 {
+/* --- 汎用 ---------------------------------------------------------------- */
+
+.screen__head {
+  margin-bottom: 1.25rem;
+}
+
+.screen__head h2 {
+  margin: 0 0 0.25rem;
+  font-size: 1.35rem;
+}
+
+.screen__sub {
+  margin: 0 0 0.75rem;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.screen__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.btn {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.15rem;
+  padding: 0.6rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  background: var(--surface);
+  cursor: pointer;
+  text-align: left;
+  transition:
+    border-color 0.12s,
+    background 0.12s;
+}
+
+.btn:hover:not(:disabled) {
+  border-color: var(--accent);
+}
+
+.btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.btn--primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #12121a;
+  font-weight: 600;
+  align-items: center;
+}
+
+.btn--ghost {
+  background: transparent;
+  align-items: center;
+}
+
+.btn--level.is-selected {
+  border-color: var(--accent);
+  background: var(--surface-2);
+}
+
+.btn__title {
+  font-weight: 600;
+}
+
+.btn__sub {
+  font-size: 0.8rem;
+  color: var(--muted);
+  line-height: 1.4;
+}
+
+.btn--primary .btn__sub {
+  color: #12121a;
+}
+
+/* --- モード選択 ---------------------------------------------------------- */
+
+.title h1 {
   margin: 0;
   font-size: 2rem;
 }
 
 .lead {
-  margin: 0.25rem 0 2rem;
-  color: #9a9aa4;
+  margin: 0.25rem 0 1.5rem;
+  color: var(--muted);
 }
 
-.phase {
-  display: inline-block;
-  margin: 0;
-  padding: 0.35rem 0.75rem;
-  border: 1px solid #35353d;
+.rules {
+  margin: 0 0 2rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.mode-block {
+  margin-bottom: 2rem;
+  padding: 1.25rem;
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+  background: var(--surface);
+}
+
+.mode-block h2 {
+  margin: 0 0 0.75rem;
+  font-size: 1.15rem;
+}
+
+.mode-block__note {
+  margin: 0 0 1rem;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.mode-block__levels {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+/* --- ユニットカード ------------------------------------------------------ */
+
+.unit-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
+  gap: 0.75rem;
+}
+
+.unit-grid--compact {
+  grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr));
+}
+
+.unit-card {
+  display: block;
+  width: 100%;
+  padding: 0.75rem;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--border);
+  border-radius: 0.5rem;
+  background: var(--surface);
+  text-align: left;
+}
+
+button.unit-card {
+  cursor: pointer;
+}
+
+button.unit-card:hover:not(:disabled) {
+  background: var(--surface-2);
+}
+
+button.unit-card:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.unit-card--gu {
+  border-left-color: var(--gu);
+}
+.unit-card--choki {
+  border-left-color: var(--choki);
+}
+.unit-card--pa {
+  border-left-color: var(--pa);
+}
+
+.unit-card.is-selected {
+  border-color: var(--accent);
+  background: var(--surface-2);
+  box-shadow: 0 0 0 1px var(--accent) inset;
+}
+
+.unit-card.is-fainted {
+  opacity: 0.45;
+}
+
+.unit-card--hidden {
+  display: grid;
+  place-items: center;
+  min-height: 5rem;
+  color: var(--muted);
+}
+
+.unit-card__unknown {
+  font-size: 1.5rem;
+}
+
+.unit-card__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.unit-card__name {
+  font-weight: 700;
+  font-size: 1.05rem;
+}
+
+.unit-card__tags {
+  font-size: 0.75rem;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.unit-card__hp-plain {
+  margin: 0.35rem 0 0;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.unit-card__slots {
+  margin: 0.6rem 0 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 0.4rem;
+}
+
+.slot {
+  display: grid;
+  grid-template-columns: 2.4rem 1fr;
+  gap: 0.15rem 0.4rem;
+  font-size: 0.8rem;
+}
+
+.slot__kind {
+  grid-row: span 2;
+  align-self: start;
+  padding: 0.05rem 0;
+  text-align: center;
+  border-radius: 0.25rem;
+  background: var(--surface-2);
+  color: var(--muted);
+  font-size: 0.7rem;
+}
+
+.slot--ability .slot__kind {
+  background: #2f2a3a;
+}
+
+.slot__name {
+  font-weight: 600;
+}
+
+.slot__uses {
+  font-weight: 400;
+  color: var(--warn);
+}
+
+.slot__text {
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+/* --- HPバー・バッジ ------------------------------------------------------ */
+
+.hp {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.hp__track {
+  flex: 1;
+  height: 0.5rem;
   border-radius: 999px;
-  font-size: 0.875rem;
-  color: #9a9aa4;
+  background: #0f0f13;
+  overflow: hidden;
+}
+
+.hp__fill {
+  height: 100%;
+  transition: width 0.25s;
+}
+
+.hp__fill--high {
+  background: var(--ok);
+}
+.hp__fill--mid {
+  background: var(--warn);
+}
+.hp__fill--low {
+  background: var(--danger);
+}
+
+.hp__text {
+  font-size: 0.75rem;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  margin: 0.4rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.badge {
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  background: var(--surface-2);
+  color: var(--muted);
+}
+
+.badge--poison {
+  background: #3a2440;
+  color: #d9a6e8;
+}
+.badge--atk {
+  background: #3d2c22;
+  color: #f0b48c;
+}
+.badge--def {
+  background: #223244;
+  color: #8cc4f0;
+}
+.badge--hazard {
+  background: #2f2a1e;
+  color: #e0c88c;
+}
+
+/* --- 選出 ---------------------------------------------------------------- */
+
+.select-block,
+.reveal-block {
+  margin-bottom: 1.5rem;
+}
+
+.select-block h3,
+.reveal-block h3 {
+  margin: 0 0 0.5rem;
+  font-size: 0.95rem;
+  color: var(--muted);
+}
+
+.select-slot {
+  position: relative;
+}
+
+.select-slot__order {
+  position: absolute;
+  top: -0.4rem;
+  left: -0.4rem;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #12121a;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+/* --- 秘匿ゲート ---------------------------------------------------------- */
+
+.gate {
+  display: grid;
+  place-content: center;
+  gap: 0.75rem;
+  width: 100%;
+  min-height: 60vh;
+  padding: 2rem;
+  border: 1px dashed var(--border);
+  border-radius: 0.75rem;
+  background: var(--surface);
+  cursor: pointer;
+  text-align: center;
+}
+
+.gate:hover {
+  border-color: var(--accent);
+}
+
+.gate__message {
+  font-size: 1.5rem;
+  font-weight: 700;
+}
+
+.gate__hint {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+/* --- バトル -------------------------------------------------------------- */
+
+.field {
+  display: grid;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.field__side {
+  padding: 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+  background: #1a1a20;
+}
+
+.field__side--p1 {
+  border-color: #2f3d4e;
+}
+
+.field__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.field__head h3 {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+
+.bench {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin: 0.6rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.bench__item {
+  display: flex;
+  align-items: baseline;
+  gap: 0.4rem;
+  padding: 0.25rem 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: 0.4rem;
+  font-size: 0.8rem;
+  background: var(--surface);
+}
+
+.bench__item.is-fainted {
+  opacity: 0.4;
+}
+
+.bench__name {
+  font-weight: 600;
+}
+
+.bench__name--hidden {
+  color: var(--muted);
+  letter-spacing: 0.1em;
+}
+
+.bench__hp,
+.bench__poison {
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+.bench__poison {
+  color: #d9a6e8;
+}
+
+/* --- 行動選択 ------------------------------------------------------------ */
+
+.panel {
+  margin-bottom: 1rem;
+}
+
+.panel__prompt {
+  margin: 0 0 0.6rem;
+  font-weight: 600;
+}
+
+.actions__group {
+  margin-bottom: 1rem;
+}
+
+.actions__group h3,
+.actions__head h3 {
+  margin: 0 0 0.4rem;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.actions__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.4rem;
+}
+
+.actions__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(13rem, 1fr));
+  gap: 0.5rem;
+}
+
+.actions__empty {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.btn--action {
+  min-height: 3.5rem;
+}
+
+/* --- ログ ---------------------------------------------------------------- */
+
+.log {
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+  background: var(--surface);
+  overflow: hidden;
+}
+
+.log__title {
+  margin: 0;
+  padding: 0.5rem 0.9rem;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.log__list {
+  margin: 0;
+  padding: 0.6rem 0.9rem;
+  max-height: 18rem;
+  overflow-y: auto;
+  list-style: none;
+  font-size: 0.85rem;
+}
+
+.log__line {
+  padding: 0.1rem 0;
+  color: var(--muted);
+}
+
+.log__line--turnHeading {
+  margin-top: 0.5rem;
+  padding-top: 0.4rem;
+  border-top: 1px solid var(--border);
+  color: var(--text);
+  font-weight: 600;
+  font-size: 0.8rem;
+}
+
+.log__line--moveUsed,
+.log__line--switch {
+  color: var(--text);
+}
+
+.log__line--faint {
+  color: var(--danger);
+  font-weight: 600;
+}
+
+.log__line--heal {
+  color: var(--ok);
+}
+
+.log__line--battleEnd {
+  margin-top: 0.4rem;
+  color: var(--accent);
+  font-weight: 700;
+}
+
+/* --- 結果 ---------------------------------------------------------------- */
+
+.result {
+  margin-bottom: 1.25rem;
+  padding: 2rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+  text-align: center;
+  background: var(--surface);
+}
+
+.result h2 {
+  margin: 0;
+  font-size: 2rem;
+}
+
+.result--win {
+  border-color: var(--ok);
+  color: var(--ok);
+}
+.result--lose {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+.result--draw {
+  border-color: var(--warn);
+  color: var(--warn);
+}
+
+.result__note {
+  margin: 0.4rem 0 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+/* --- 画面幅が広いとき ---------------------------------------------------- */
+
+@media (min-width: 48rem) {
+  .app {
+    padding: 2rem 1.5rem 4rem;
+  }
+
+  .field {
+    grid-template-columns: 1fr 1fr;
+  }
 }
