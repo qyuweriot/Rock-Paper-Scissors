@@ -6,3 +6,6 @@ package-lock.json
 
 # 手書きの仕様書。整形で差分ノイズを出さない
 docs/
+
+# npm run sim の生成物。整形すると調整前後の git diff が読めなくなる
+reports/
