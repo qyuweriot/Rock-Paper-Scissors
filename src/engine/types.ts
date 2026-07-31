@@ -127,10 +127,25 @@ export interface BattleState {
   turn: number;
   /** 乱数は団扇の交代先抽選のみ。engine/rng.ts を経由する (PLAN §3.4) */
   rngSeed: number;
-  /** 決着していなければ null。相打ちは 'draw' (SPEC §8) */
-  result: BattleResult | null;
+  phase: BattlePhase;
 }
 
+/**
+ * 試合の進行段階。
+ *
+ * 死に出しは交代先をプレイヤーが選ぶ (SPEC §5.7) ため、ターン解決を
+ * 途中で止めて呼び出し側に選択を求める必要がある。それを型で表したもの。
+ * 設置ダメージで死に出したユニットが即瀕死になる連鎖も、
+ * awaitingReplacement を再び返すことで表現される。
+ */
+export type BattlePhase =
+  /** 両プレイヤーの行動宣言待ち (SPEC §5.1) */
+  | { kind: 'awaitingActions' }
+  /** 死に出しの交代先待ち。sides に選択が必要な陣営が入る */
+  | { kind: 'awaitingReplacement'; sides: Side[] }
+  | { kind: 'ended'; result: BattleResult };
+
+/** 相打ちによる引き分けがありうる (SPEC §8) */
 export type BattleResult = 'p1' | 'p2' | 'draw';
 
 // --- 行動 -------------------------------------------------------------------
