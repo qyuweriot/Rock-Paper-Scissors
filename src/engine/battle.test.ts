@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { getLegalActions, resolveReplacements, resolveTurn } from './battle';
+import { UNITS } from '../data/units';
 import {
   active,
   eventsOfType,
@@ -19,7 +20,7 @@ import type { BattleEvent } from './types';
  * 素の殴り合いしかしない。テストはその前提で書いている。
  *
  * よく使う値:
- *   石       gu   HP105 中  技0 威力25 / 技1 威力35 反動15
+ *   石       gu   HP100 中  技0 威力25 / 技1 威力35 反動15
  *   紙       pa   HP100 中  技0 威力25 / 技1 威力15 先制
  *   一閃     choki HP40 速  技0 威力35
  *   堅牢     gu   HP140 遅  技0 威力15
@@ -121,7 +122,7 @@ describe('同段の処理と不発 (SPEC §5.3 / §5.5)', () => {
     expect(recoil?.target).toEqual({ side: 'p1', partyIndex: 0 });
     // 相手への攻撃ダメージが先に並ぶ
     expect(damages.indexOf(recoil as (typeof damages)[number])).toBeGreaterThan(0);
-    expect(active(after, 'p1').hp).toBe(105 - 15 - 15); // 反動15 + 堅牢の威力15(互角)
+    expect(active(after, 'p1').hp).toBe(UNITS.ishi.maxHp - 15 - 15); // 反動15 + 堅牢の威力15(互角)
   });
 });
 

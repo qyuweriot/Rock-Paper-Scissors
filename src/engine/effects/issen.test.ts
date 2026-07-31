@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { resolveTurn } from '../battle';
 import { active, eventsOfType, INERT, inert, makeBattle, move, switchTo } from '../testkit';
-import { PERSISTENT_MODIFIER_CAP } from '../constants';
+import { ISSEN_ATK_UP, PERSISTENT_MODIFIER_CAP } from '../constants';
 import type { BattleEvent } from '../types';
 
 /**
- * 一閃 choki HP40 速 / 技0 威力35 / 技1 攻勢+10(交代まで、上限+20) (SPEC §10.9)
+ * 一閃 choki HP40 速 / 技0 威力35 / 技1 攻勢+15(交代まで、上限+30) (SPEC §10.9)
  *
  * 相手には何もしない器を置き、一閃が生き残る状況で観察する。
  */
@@ -22,9 +22,9 @@ describe('一閃 — 構え (SPEC §10.9)', () => {
     return { state, lastEvents };
   };
 
-  it('1回で攻勢+10、2回で+20 まで累積する', () => {
+  it('1回で ISSEN_ATK_UP ぶん、2回で累積上限まで積む', () => {
     const once = stack(1);
-    expect(active(once.state, 'p1').modifiers.atk).toBe(10);
+    expect(active(once.state, 'p1').modifiers.atk).toBe(ISSEN_ATK_UP);
 
     const twice = stack(2);
     expect(active(twice.state, 'p1').modifiers.atk).toBe(PERSISTENT_MODIFIER_CAP);
@@ -47,8 +47,8 @@ describe('一閃 — 構え (SPEC §10.9)', () => {
     // 一閃 技0 威力35。チョキ→パー は有利 (+25)
     const table: [stacks: number, expected: number][] = [
       [0, 60],
-      [1, 70],
-      [2, 80],
+      [1, 75],
+      [2, 90],
     ];
 
     for (const [stacks, expected] of table) {
@@ -66,7 +66,7 @@ describe('一閃 — 構え (SPEC §10.9)', () => {
     let state = makeBattle(['issen', 'kenro'], [INERT]);
     state = resolveTurn(state, { p1: move(1), p2: inert() }).state;
     state = resolveTurn(state, { p1: move(1), p2: inert() }).state;
-    expect(active(state, 'p1').modifiers.atk).toBe(20);
+    expect(active(state, 'p1').modifiers.atk).toBe(PERSISTENT_MODIFIER_CAP);
 
     state = resolveTurn(state, { p1: switchTo(1), p2: inert() }).state;
     state = resolveTurn(state, { p1: switchTo(0), p2: inert() }).state;

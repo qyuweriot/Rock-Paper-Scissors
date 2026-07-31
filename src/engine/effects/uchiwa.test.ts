@@ -3,7 +3,7 @@ import { resolveTurn } from '../battle';
 import { eventsOfType, makeBattle, move, setHazard } from '../testkit';
 
 /**
- * 団扇 pa HP80 遅 / 技0 威力25 / 技1 相手を強制交代(交代先はランダム) (SPEC §10.14)
+ * 団扇 pa HP90 遅 / 技0 威力25 / 技1 相手を強制交代(交代先はランダム) (SPEC §10.14)
  *
  * 本ゲームで乱数を使う唯一の箇所。シードは BattleState が持つ。
  */

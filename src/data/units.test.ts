@@ -14,18 +14,18 @@ const SPEC_TABLE: [id: string, name: string, attribute: Attribute, hp: number, s
   ['tekken', '鉄拳', 'gu', 50, 'mid'],
   ['magyu', '魔球', 'gu', 100, 'mid'],
   ['kenro', '堅牢', 'gu', 140, 'slow'],
-  ['ishi', '石', 'gu', 105, 'mid'],
+  ['ishi', '石', 'gu', 100, 'mid'],
   // チョキ
   ['hasamimushi', 'ハサミムシ', 'choki', 120, 'fast'],
   ['yamaarashi', '山嵐', 'choki', 90, 'mid'],
   ['bara', 'バラ', 'choki', 80, 'mid'],
   ['issen', '一閃', 'choki', 40, 'fast'],
-  ['hasami', 'はさみ', 'choki', 95, 'fast'],
+  ['hasami', 'はさみ', 'choki', 100, 'fast'],
   // パー
   ['tenohira', '手のひら', 'pa', 100, 'mid'],
   ['ghost', 'ゴースト', 'pa', 60, 'fast'],
   ['utsuwa', '器', 'pa', 130, 'mid'],
-  ['uchiwa', '団扇', 'pa', 80, 'slow'],
+  ['uchiwa', '団扇', 'pa', 90, 'slow'],
   ['kami', '紙', 'pa', 100, 'mid'],
 ];
 

@@ -146,7 +146,7 @@ export const UNITS = {
     id: 'ishi',
     name: '石',
     attribute: 'gu',
-    maxHp: 105,
+    maxHp: 100,
     speed: 'mid',
     slots: [
       {
@@ -278,7 +278,7 @@ export const UNITS = {
         kind: 'move',
         move: {
           name: '構え',
-          text: '自分の攻勢+10(交代または瀕死まで持続 / 累積上限+20)。',
+          text: '自分の攻勢+15(交代または瀕死まで持続 / 累積上限+30)。',
           damage: { kind: 'none' },
           priority: 'normal',
           hooks: issenFocus,
@@ -291,7 +291,7 @@ export const UNITS = {
     id: 'hasami',
     name: 'はさみ',
     attribute: 'choki',
-    maxHp: 95,
+    maxHp: 100,
     speed: 'fast',
     slots: [
       {
@@ -338,7 +338,7 @@ export const UNITS = {
         kind: 'move',
         move: {
           name: '整息',
-          text: '自分のHPを30回復する(満タンなら何も起こらない)。1試合3回まで。',
+          text: '自分のHPを25回復する(満タンなら何も起こらない)。1試合3回まで。',
           damage: { kind: 'none' },
           priority: 'normal',
           maxUses: TENOHIRA_HEAL_USES,
@@ -369,7 +369,7 @@ export const UNITS = {
         kind: 'ability',
         ability: {
           name: '呪詛返し',
-          text: '瀕死になったとき、相手に固定30を返す(死因を問わない)。',
+          text: '瀕死になったとき、相手に固定35を返す(死因を問わない)。',
           hooks: ghostCurse,
         },
       },
@@ -410,7 +410,7 @@ export const UNITS = {
     id: 'uchiwa',
     name: '団扇',
     attribute: 'pa',
-    maxHp: 80,
+    maxHp: 90,
     speed: 'slow',
     slots: [
       {

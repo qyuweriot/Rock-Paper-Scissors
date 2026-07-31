@@ -30,8 +30,8 @@ export const HAZARD_MAX_STACKS = 3;
 
 // --- 修正値 (SPEC §4.3) -----------------------------------------------------
 
-/** 持続 'untilSwitch' の累積上限。一閃の積みは+20(2回)まで */
-export const PERSISTENT_MODIFIER_CAP = 20;
+/** 持続 'untilSwitch' の累積上限。一閃の積みは+30(2回)まで */
+export const PERSISTENT_MODIFIER_CAP = 30;
 
 // --- ダメージ (SPEC §4.1) ---------------------------------------------------
 
@@ -69,15 +69,15 @@ export const KENRO_TURN_HEAL = 5;
 /** 山嵐: 攻撃技を受けたときに返す固定ダメージ (§10.7) */
 export const YAMAARASHI_REFLECT = 10;
 /** ゴースト: 瀕死時に返す固定ダメージ (§10.12) */
-export const GHOST_FAINT_REFLECT = 30;
+export const GHOST_FAINT_REFLECT = 35;
 /** 手のひら: 技2の自己回復量 (§10.11) */
-export const TENOHIRA_HEAL = 30;
+export const TENOHIRA_HEAL = 25;
 /** 手のひら: 技2の1試合あたりの使用回数上限。回復の応酬による膠着を防ぐ (§10.11) */
 export const TENOHIRA_HEAL_USES = 3;
 /** 器: 技2で控え1体を回復する量 (§10.13) */
 export const UTSUWA_HEAL = 15;
 /** 一閃: 技2の攻勢上昇。累積上限は PERSISTENT_MODIFIER_CAP (§10.9) */
-export const ISSEN_ATK_UP = 10;
+export const ISSEN_ATK_UP = 15;
 /** はさみ: 技2の守勢上昇。このターンのみ (§10.10) */
 export const HASAMI_DEF_UP = 10;
 /** 鉄拳: 追い討ちの威力上昇。相手が交代を宣言していた場合のみ (§10.2) */

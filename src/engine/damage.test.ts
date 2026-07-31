@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { computeDamage, getMatchup, getTypeModifier } from './damage';
-import { TYPE_ADVANTAGE, TYPE_DISADVANTAGE, TYPE_NEUTRAL } from './constants';
+import {
+  ISSEN_ATK_UP,
+  PERSISTENT_MODIFIER_CAP,
+  TYPE_ADVANTAGE,
+  TYPE_DISADVANTAGE,
+  TYPE_NEUTRAL,
+} from './constants';
 import type { Attribute, DamageSpec } from './types';
 import { getMove, UNITS } from '../data/units';
 
@@ -124,18 +130,24 @@ describe('実データとの突き合わせ', () => {
   it('一閃の積みテーブルが SPEC §10.9 と一致する', () => {
     const slash = getMove(UNITS.issen, 0); // 威力35
 
-    // [積み回数, 攻勢修正, 有利対面, 互角対面]
-    const table: [number, number, number, number][] = [
-      [0, 0, 60, 35],
-      [1, 10, 70, 45],
-      [2, 20, 80, 55],
+    // [積み回数, 有利対面, 互角対面]。攻勢修正は ISSEN_ATK_UP から導くので、
+    // 積み幅を変えるとこのテーブルの期待値も一緒に検算される
+    const table: [number, number, number][] = [
+      [0, 60, 35],
+      [1, 75, 50],
+      [2, 90, 65],
     ];
 
-    for (const [, atk, advantage, neutral] of table) {
+    for (const [stacks, advantage, neutral] of table) {
+      const atk = Math.min(ISSEN_ATK_UP * stacks, PERSISTENT_MODIFIER_CAP);
       // チョキ → パー が有利、チョキ → チョキ が互角
       expect(dmg(slash.damage, 'choki', 'pa', { atk })).toBe(advantage);
       expect(dmg(slash.damage, 'choki', 'choki', { atk })).toBe(neutral);
     }
+  });
+
+  it('一閃は2回で累積上限に達する (SPEC §10.9)', () => {
+    expect(ISSEN_ATK_UP * 2).toBe(PERSISTENT_MODIFIER_CAP);
   });
 
   it('粉砕は有利対面85 / 互角60 / 不利対面50 (SPEC §10.1)', () => {

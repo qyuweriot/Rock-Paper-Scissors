@@ -22,7 +22,7 @@ const reflects = (events: ReturnType<typeof resolveTurn>['events']) =>
   eventsOfType(events, 'damage').filter((d) => d.source === 'reflect');
 
 describe('ゴースト — 呪詛返し (SPEC §10.12)', () => {
-  it('通常攻撃で倒されたとき、相手に固定30を返す', () => {
+  it('通常攻撃で倒されたとき、相手に GHOST_FAINT_REFLECT を返す', () => {
     // 石 gu 技0 威力25 → グー→パー は不利で15
     const state = makeBattle(['ghost'], ['ishi']);
     setHp(state, 'p1', 0, 15);
@@ -74,15 +74,15 @@ describe('ゴースト — 呪詛返し (SPEC §10.12)', () => {
   });
 
   it('相打ちの場合も発動する', () => {
-    // はさみ choki HP95 速。ゴーストはパーなのでチョキには不利 (威力10−10 = 0)
+    // はさみ choki HP100 速。ゴーストはパーなのでチョキには不利 (威力15−10 = 5)
     const state = makeBattle(['ghost'], ['hasami']);
     setHp(state, 'p1', 0, 20); // はさみの50ダメージで落ちる
-    setHp(state, 'p2', 0, 25); // ゴーストの反射30 で落ちる
+    setHp(state, 'p2', 0, GHOST_FAINT_REFLECT); // ゴーストの反射でちょうど落ちる
 
     const { state: after, events } = resolveTurn(state, { p1: move(0), p2: move(0) });
 
     expect(reflects(events)).toHaveLength(1);
-    // 反射30 が 25 の石を落とし、両者瀕死で引き分けになる
+    // 反射がはさみを落とし、両者瀕死で引き分けになる
     expect(after.phase).toEqual({ kind: 'ended', result: 'draw' });
   });
 

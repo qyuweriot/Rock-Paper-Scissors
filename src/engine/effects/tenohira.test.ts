@@ -27,14 +27,14 @@ describe('手のひら — 掌打 (固定ダメージ)', () => {
 });
 
 describe('手のひら — 整息 (SPEC §10.11)', () => {
-  it('自分のHPを30回復する', () => {
+  it('自分のHPを TENOHIRA_HEAL ぶん回復する', () => {
     const state = makeBattle(['tenohira'], [INERT]);
     setHp(state, 'p1', 0, 50);
 
     const { state: after, events } = resolveTurn(state, { p1: move(1), p2: inert() });
 
     expect(eventsOfType(events, 'heal')[0]?.amount).toBe(TENOHIRA_HEAL);
-    expect(active(after, 'p1').hp).toBe(80);
+    expect(active(after, 'p1').hp).toBe(50 + TENOHIRA_HEAL);
   });
 
   it('最大HPを超えては回復しない', () => {

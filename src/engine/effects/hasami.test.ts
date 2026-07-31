@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { resolveTurn } from '../battle';
 import { active, eventsOfType, INERT, makeBattle, move, switchTo } from '../testkit';
+import { UNITS } from '../../data/units';
 
 /**
- * はさみ choki HP95 速 / 技0 威力25 / 技1 威力10 + このターン守勢+10 (SPEC §10.10)
+ * はさみ choki HP100 速 / 技0 威力25 / 技1 威力10 + このターン守勢+10 (SPEC §10.10)
  */
 describe('はさみ — 受け切り (SPEC §10.10)', () => {
   it('相手の技によるダメージを10軽減する', () => {
@@ -13,7 +14,7 @@ describe('はさみ — 受け切り (SPEC §10.10)', () => {
 
     const taken = eventsOfType(events, 'damage').find((d) => d.target.side === 'p1');
     expect(taken?.amount).toBe(40); // 50 − 10
-    expect(active(after, 'p1').hp).toBe(95 - 40);
+    expect(active(after, 'p1').hp).toBe(UNITS.hasami.maxHp - 40);
   });
 
   it('固定ダメージは軽減できない (SPEC §4.2)', () => {

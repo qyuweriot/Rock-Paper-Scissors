@@ -4,7 +4,7 @@ import { ISSEN_ATK_UP } from '../constants';
 import type { EffectHooks } from './context';
 
 /**
- * 技2「構え」: 攻勢+10。交代または瀕死までの永続。
+ * 技2「構え」: 攻勢を ISSEN_ATK_UP ぶん上げる。交代または瀕死までの永続。
  *
  * 累積上限 (+20 = 2回分) と、上限到達時に「無効だがターンは消費する」挙動は
  * EffectApi.addModifier 側が持つ。ここで上限を判定すると、同じ判定が
