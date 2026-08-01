@@ -6,7 +6,7 @@
 
 import { getUnit, type UnitId } from '../../data/units';
 import type { UnitState } from '../../engine/types';
-import { UNIT_ICONS } from '../icons';
+import { HIDDEN_ICON, UNIT_ICONS } from '../icons';
 import { ATTRIBUTE_LABELS, SPEED_LABELS } from '../labels';
 import { HpBar } from './HpBar';
 import { StatusBadges } from './StatusBadges';
@@ -28,7 +28,7 @@ export function UnitCard({ unitId, state, onClick, selected, disabled, hidden, c
   if (hidden) {
     return (
       <div className="unit-card unit-card--hidden">
-        <span className="unit-card__unknown">?</span>
+        <span className="unit-card__unknown">{HIDDEN_ICON}</span>
       </div>
     );
   }
@@ -58,7 +58,7 @@ export function UnitCard({ unitId, state, onClick, selected, disabled, hidden, c
 
       {state ? (
         <>
-          <HpBar hp={state.hp} maxHp={def.maxHp} />
+          <HpBar hp={state.hp} maxHp={def.maxHp} poisonStacks={state.poisonStacks} />
           <StatusBadges state={state} />
         </>
       ) : (
@@ -75,16 +75,21 @@ export function UnitCard({ unitId, state, onClick, selected, disabled, hidden, c
             return (
               <li key={entry.name} className={isMove ? 'slot slot--move' : 'slot slot--ability'}>
                 <span className="slot__kind">{isMove ? '技' : '特性'}</span>
-                <span className="slot__name">
-                  {entry.name}
-                  {max !== undefined && (
-                    <span className="slot__uses">
-                      {' '}
-                      残り {Math.max(0, max - used)}/{max}
+                {/* 構造は StageUnit と揃える。.slot の CSS は両者の共有物 */}
+                <div className="slot__body">
+                  <div className="slot__head">
+                    <span className="slot__name">
+                      {entry.name}
+                      {max !== undefined && (
+                        <span className="slot__uses">
+                          {' '}
+                          残り {Math.max(0, max - used)}/{max}
+                        </span>
+                      )}
                     </span>
-                  )}
-                </span>
-                <span className="slot__text">{entry.text}</span>
+                  </div>
+                  <span className="slot__text">{entry.text}</span>
+                </div>
               </li>
             );
           })}

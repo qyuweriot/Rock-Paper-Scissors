@@ -6,6 +6,7 @@ import {
   displayLog,
   gateMessage,
   initialState,
+  isAwaitingPlayback,
   isPlaying,
   isUnitVisible,
   legalActionsFor,
@@ -70,13 +71,11 @@ function toBattle(mode: 'ai' | 'hotseat', seed = 1234): FlowState {
     mode === 'ai'
       ? [
           { type: 'setParty', party: PARTY_A },
-          { type: 'confirmGate' }, // reveal → select
           { type: 'setTeam', team: TEAM_A },
         ]
       : [
           { type: 'setParty', party: PARTY_A },
           { type: 'setParty', party: PARTY_B },
-          { type: 'confirmGate' }, // reveal → selectGate(p1)
           { type: 'confirmGate' }, // selectGate(p1) → select(p1)
           { type: 'setTeam', team: TEAM_A },
           { type: 'confirmGate' }, // selectGate(p2) → select(p2)
@@ -101,20 +100,16 @@ describe('flow — 初期状態', () => {
 });
 
 describe('flow — AI戦の遷移 (PLAN §290)', () => {
-  it('編成すると相手の編成が自動で決まり、公開画面へ進む', () => {
+  /**
+   * 相互公開 (SPEC §1) は選出画面が兼ねる。専用の公開画面は置かない ─
+   * 選出画面が両者の編成を並べるので、同じ内容を二度見せることになるため。
+   */
+  it('編成すると相手の編成が自動で決まり、そのまま選出へ進む', () => {
     const state = reduce(start('ai'), { type: 'setParty', party: PARTY_A });
 
-    expect(state.screen).toEqual({ kind: 'reveal' });
+    expect(state.screen).toEqual({ kind: 'select', side: 'p1' });
     expect(state.parties.p1).toEqual(PARTY_A);
     expect(state.parties.p2).toHaveLength(PARTY_SIZE);
-  });
-
-  it('公開画面から選出へ直行する。秘匿ゲートは挟まない', () => {
-    const state = run(start('ai'), [
-      { type: 'setParty', party: PARTY_A },
-      { type: 'confirmGate' },
-    ]);
-    expect(state.screen).toEqual({ kind: 'select', side: 'p1' });
   });
 
   it('選出すると相手の選出も自動で決まり、バトルが始まる', () => {
@@ -168,18 +163,15 @@ describe('flow — 対人戦の秘匿フロー (SPEC §11)', () => {
     expect(first.screen).toEqual({ kind: 'party', side: 'p2' });
 
     const second = reduce(first, { type: 'setParty', party: PARTY_B });
-    expect(second.screen).toEqual({ kind: 'reveal' });
+    expect(second.screen).toEqual({ kind: 'selectGate', side: 'p1' });
     expect(second.parties).toEqual({ p1: PARTY_A, p2: PARTY_B });
   });
 
-  it('選出は 公開 → ゲート → P1 → ゲート → P2 の順に進む', () => {
+  it('選出は ゲート → P1 → ゲート → P2 の順に進む', () => {
     let state = run(start('hotseat'), [
       { type: 'setParty', party: PARTY_A },
       { type: 'setParty', party: PARTY_B },
     ]);
-    expect(state.screen).toEqual({ kind: 'reveal' });
-
-    state = reduce(state, { type: 'confirmGate' });
     expect(state.screen).toEqual({ kind: 'selectGate', side: 'p1' });
     expect(gateMessage(state)).toBe('プレイヤー1 の選出です');
 
@@ -202,8 +194,9 @@ describe('flow — 対人戦の秘匿フロー (SPEC §11)', () => {
     let state = toBattle('hotseat');
 
     expect(state.turn).toEqual({ kind: 'actionGate', side: 'p1' });
-    expect(gateMessage(state)).toBe('プレイヤー1 の入力です');
     expect(activeInputSide(state)).toBeNull(); // ゲート中は入力を受け付けない
+    // バトル中のゲートは全画面にしない。盤面を残したまま操作欄に出す
+    expect(gateMessage(state)).toBeNull();
 
     state = reduce(state, { type: 'confirmGate' });
     expect(state.turn).toEqual({ kind: 'awaitAction', side: 'p1' });
@@ -215,7 +208,6 @@ describe('flow — 対人戦の秘匿フロー (SPEC §11)', () => {
     // P1 の宣言は保持されたまま、P2 のゲートへ
     expect(state.turn).toEqual({ kind: 'actionGate', side: 'p2' });
     expect(state.declared.p1).toEqual(a1);
-    expect(gateMessage(state)).toBe('プレイヤー2 の入力です');
 
     state = reduce(state, { type: 'confirmGate' });
     expect(state.turn).toEqual({ kind: 'awaitAction', side: 'p2' });
@@ -249,10 +241,22 @@ describe('flow — 対人戦の秘匿フロー (SPEC §11)', () => {
 });
 
 describe('flow — 相手の控えの秘匿 (SPEC §11)', () => {
-  it('AI戦ではすべて公開する', () => {
+  /**
+   * 以前はAI戦で無条件に公開しており、開始時点で相手の選出が読めてしまっていた。
+   * 選出画面で公開されるのはパーティー5体であって、選ばれた3体ではない (SPEC §11)。
+   */
+  it('AI戦でも相手の控えは隠す。場に出ている先頭だけ見える', () => {
+    const state = toBattle('ai');
+
+    expect(isUnitVisible(state, 'p2', 0, 'p1')).toBe(true);
+    expect(isUnitVisible(state, 'p2', 1, 'p1')).toBe(false);
+    expect(isUnitVisible(state, 'p2', 2, 'p1')).toBe(false);
+  });
+
+  it('AI戦では自分の陣営が全部見える。観戦者を渡さなくても人間側と分かる', () => {
     const state = toBattle('ai');
     for (let i = 0; i < TEAM_SIZE; i++) {
-      expect(isUnitVisible(state, 'p2', i, 'p1')).toBe(true);
+      expect(isUnitVisible(state, 'p1', i, null)).toBe(true);
     }
   });
 
@@ -410,6 +414,10 @@ describe('flow — ターン解決の再生', () => {
     expect(sawReplacementPlayback).toBe(true);
   });
 
+  it('AI戦は確認を挟まずすぐ再生を始める', () => {
+    expect(isAwaitingPlayback(playing())).toBe(false);
+  });
+
   it('決着のターンも最後まで再生してから結果画面へ行く', () => {
     let lastBattleState: FlowState | null = null;
     const final = playOut(toBattle('ai'), (state) => {
@@ -419,6 +427,131 @@ describe('flow — ターン解決の再生', () => {
     expect(final.screen.kind).toBe('result');
     // バトル画面の最後の状態は再生中だった = 決着の様子を見せてから遷移している
     expect(lastBattleState).not.toBeNull();
+  });
+});
+
+/**
+ * 対人戦は片方が宣言した直後に再生を始めると、端末を持っていないもう一方が解決を見逃す。
+ * **確認で止まっている間に解決後の盤面を見せてはいけない** ─ 結果が先に出てしまう。
+ */
+describe('flow — 再生前の共有確認 (対人戦)', () => {
+  /** 対人戦で両者が宣言し、再生の開始待ちになった状態 */
+  const awaiting = (): FlowState => {
+    let state = toBattle('hotseat');
+    for (let i = 0; i < 4 && !isAwaitingPlayback(state); i++) {
+      const turn = state.turn;
+      if (turn?.kind === 'actionGate') {
+        state = reduce(state, { type: 'confirmGate' });
+      } else if (turn?.kind === 'awaitAction') {
+        const action = legalActionsFor(state, turn.side)[0];
+        if (!action) throw new Error('合法手がありません');
+        state = reduce(state, { type: 'declareAction', action });
+      }
+    }
+    return state;
+  };
+
+  it('両者の宣言が揃うと、再生を始めずに確認で止まる', () => {
+    const state = awaiting();
+
+    expect(isAwaitingPlayback(state)).toBe(true);
+    expect(isPlaying(state)).toBe(true); // 入力は受け付けない
+    expect(state.turn).toBeNull();
+    expect(currentFrame(state)).toBeNull();
+  });
+
+  it('確認中の盤面は解決前のまま。結果が先に見えない', () => {
+    const state = awaiting();
+
+    expect(displayBattle(state)).toBe(state.playback?.before);
+    expect(displayBattle(state)).not.toBe(state.battle);
+    // 解決前なのでターン数もまだ増えていない
+    expect(displayBattle(state)?.turn).toBeLessThan(state.battle?.turn ?? 0);
+  });
+
+  it('確認中はログも増えない。見出しだけが出ている', () => {
+    const state = awaiting();
+    expect(displayLog(state)).toBe(state.log);
+    expect(displayLog(state).every((entry) => entry.type === 'turnHeading')).toBe(true);
+  });
+
+  it('確認中も行動宣言は受け付けない', () => {
+    const state = awaiting();
+    const action = legalActionsFor(state, 'p1')[0];
+    if (!action) throw new Error('合法手がありません');
+
+    expect(reduce(state, { type: 'declareAction', action })).toBe(state);
+  });
+
+  it('advancePlayback で再生が始まる。コマは先頭から', () => {
+    const started = reduce(awaiting(), { type: 'advancePlayback' });
+
+    expect(isAwaitingPlayback(started)).toBe(false);
+    expect(started.playback?.index).toBe(0);
+    expect(currentFrame(started)).toBe(started.playback?.frames[0]);
+  });
+
+  it('死に出しの解決前にも確認が入る (SPEC §5.7)', () => {
+    let sawReplacementGate = false;
+    let previousTurn: FlowState['turn'] = null;
+
+    playOut(toBattle('hotseat'), (state) => {
+      if (previousTurn?.kind === 'awaitReplacement' && isAwaitingPlayback(state)) {
+        sawReplacementGate = true;
+      }
+      if (!isPlaying(state)) previousTurn = state.turn;
+    });
+
+    expect(sawReplacementGate).toBe(true);
+  });
+});
+
+/**
+ * 全画面で覆うゲートは選出前だけ。バトル中に盤面まで消すと、
+ * 解決を見終わった瞬間に結果が画面から消えてしまう (SPEC §11)。
+ */
+describe('flow — 全画面ゲートは選出前だけ', () => {
+  it('選出前のゲートは文言を返す', () => {
+    const state = run(start('hotseat'), [
+      { type: 'setParty', party: PARTY_A },
+      { type: 'setParty', party: PARTY_B },
+    ]);
+    expect(gateMessage(state)).toBe('プレイヤー1 の選出です');
+  });
+
+  it('バトル中はどの段でも null。操作欄に出すため', () => {
+    let state = toBattle('hotseat');
+    let sawActionGate = false;
+    let sawReplacementGate = false;
+
+    for (let i = 0; i < 400 && state.screen.kind === 'battle'; i++) {
+      expect(gateMessage(state)).toBeNull();
+
+      if (isPlaying(state)) {
+        state = reduce(state, { type: 'advancePlayback' });
+        continue;
+      }
+      const turn = state.turn;
+      if (!turn) break;
+      if (turn.kind === 'actionGate') sawActionGate = true;
+      if (turn.kind === 'replacementGate') sawReplacementGate = true;
+
+      if (turn.kind === 'actionGate' || turn.kind === 'replacementGate') {
+        state = reduce(state, { type: 'confirmGate' });
+      } else if (turn.kind === 'awaitAction') {
+        const action = legalActionsFor(state, turn.side)[0];
+        if (!action) throw new Error('合法手がありません');
+        state = reduce(state, { type: 'declareAction', action });
+      } else {
+        const choice = replacementOptions(state, turn.side)[0];
+        if (choice === undefined) throw new Error('交代先がありません');
+        state = reduce(state, { type: 'declareReplacement', partyIndex: choice });
+      }
+    }
+
+    // ゲートの段を実際に通っていることを確かめる (素通りしていたら意味がない)
+    expect(sawActionGate).toBe(true);
+    expect(sawReplacementGate).toBe(true);
   });
 });
 

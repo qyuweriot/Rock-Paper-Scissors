@@ -11,6 +11,8 @@
 import { useState } from 'react';
 import { getMove, getUnit, type UnitId } from '../../data/units';
 import type { Action, BattleState, Side, SlotIndex } from '../../engine/types';
+import { breakdownText, previewMove } from '../preview';
+import { HpBar } from './HpBar';
 
 interface Props {
   battle: BattleState;
@@ -30,6 +32,11 @@ interface MoveGroup {
 function unitIdAt(battle: BattleState, side: Side, partyIndex: number): UnitId | null {
   const unit = battle.sides[side].party[partyIndex];
   return unit ? (unit.unitId as UnitId) : null;
+}
+
+/** 交代先ボタンに出す一行。何ができる相手か分からないと選べない */
+function slotName(slot: ReturnType<typeof getUnit>['slots'][number]): string {
+  return slot.kind === 'move' ? slot.move.name : slot.ability.name;
 }
 
 export function ActionPanel({ battle, side, actions, onDeclare }: Props) {
@@ -104,21 +111,36 @@ export function ActionPanel({ battle, side, actions, onDeclare }: Props) {
       <div className="actions__group">
         <h3>技</h3>
         <div className="actions__grid">
-          {groups.map((group) => (
-            <button
-              key={group.slotIndex}
-              type="button"
-              className="btn btn--action"
-              onClick={() => {
-                const only = group.candidates[0];
-                if (group.candidates.length === 1 && only) onDeclare(only);
-                else setPending(group);
-              }}
-            >
-              <span className="btn__title">{group.name}</span>
-              <span className="btn__sub">{group.text}</span>
-            </button>
-          ))}
+          {groups.map((group) => {
+            // いま打ったら何ダメージか。表記どおりの威力が入ることはまずない
+            const preview = previewMove(battle, side, group.slotIndex);
+            return (
+              <button
+                key={group.slotIndex}
+                type="button"
+                className="btn btn--action"
+                onClick={() => {
+                  const only = group.candidates[0];
+                  if (group.candidates.length === 1 && only) onDeclare(only);
+                  else setPending(group);
+                }}
+              >
+                <span className="btn__title">
+                  {group.name}
+                  {preview && preview.damage !== null && (
+                    <em className={`btn__damage btn__damage--${preview.matchup ?? 'fixed'}`}>
+                      → {preview.damage}
+                      {preview.uncertain && '〜'}
+                    </em>
+                  )}
+                </span>
+                <span className="btn__sub">{group.text}</span>
+                {preview && preview.damage !== null && (
+                  <span className="btn__breakdown">{breakdownText(preview)}</span>
+                )}
+              </button>
+            );
+          })}
         </div>
       </div>
 
@@ -142,9 +164,8 @@ export function ActionPanel({ battle, side, actions, onDeclare }: Props) {
                   onClick={() => onDeclare(action)}
                 >
                   <span className="btn__title">{def.name}</span>
-                  <span className="btn__sub">
-                    HP {unit.hp} / {def.maxHp}
-                  </span>
+                  <span className="btn__sub">{def.slots.map(slotName).join(' / ')}</span>
+                  <HpBar hp={unit.hp} maxHp={def.maxHp} poisonStacks={unit.poisonStacks} />
                 </button>
               );
             })}

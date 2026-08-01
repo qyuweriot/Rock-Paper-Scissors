@@ -39,9 +39,11 @@ export type Screen =
   | { kind: 'mode' }
   /** 15種から5体 (SPEC §1)。対人戦は p1 → p2 の順に2回 */
   | { kind: 'party'; side: Side }
-  /** 両者のパーティーを相互公開 (SPEC §1 / §11) */
-  | { kind: 'reveal' }
-  /** 「プレイヤーNの選出です」(SPEC §11)。対人戦のみ */
+  /**
+   * 「プレイヤーNの選出です」(SPEC §11)。対人戦のみ。
+   * パーティーの相互公開 (SPEC §1) は選出画面が両者を並べることで満たす ─
+   * 専用の公開画面は同じ内容を二度見せるだけだったので置かない。
+   */
   | { kind: 'selectGate'; side: Side }
   /** 5体から3体 (SPEC §1) */
   | { kind: 'select'; side: Side }
@@ -57,6 +59,21 @@ export type TurnPhase =
   | { kind: 'awaitAction'; side: Side }
   | { kind: 'replacementGate'; side: Side }
   | { kind: 'awaitReplacement'; side: Side };
+
+export interface Playback {
+  /**
+   * 解決**前**の盤面。`awaitingStart` の間はこれを見せる。
+   * `frames[0]` は既に1件目のイベントを適用した後なので、解決前の絵はここにしかない。
+   */
+  before: BattleState;
+  frames: Frame[];
+  index: number;
+  /**
+   * 再生開始待ち。対人戦で「2人とも画面を見ているか」を確認するために挟む (PLAN §7)。
+   * **待機中に解決後の盤面を見せてはいけない。** 確認画面に結果が先に出てしまう。
+   */
+  awaitingStart: boolean;
+}
 
 export interface FlowState {
   mode: Mode;
@@ -80,7 +97,7 @@ export interface FlowState {
    * ターン解決の再生 (1ステップずつ見せる)。null なら再生していない。
    * **再生中は入力を受け付けない。** `turn` を立てるのは再生が終わってから。
    */
-  playback: { frames: Frame[]; index: number } | null;
+  playback: Playback | null;
   log: LogEntry[];
   /** 団扇の抽選とAIの編成に使う (PLAN §3.4) */
   rngSeed: number;
@@ -93,7 +110,7 @@ export type FlowEvent =
   | { type: 'setTeam'; team: UnitId[] }
   | { type: 'declareAction'; action: Action }
   | { type: 'declareReplacement'; partyIndex: number }
-  /** 再生を1コマ進める。末尾まで来たら本編を再開する */
+  /** 再生を1コマ進める。開始待ちなら再生を始め、末尾まで来たら本編を再開する */
   | { type: 'advancePlayback' }
   /** 残りのコマを飛ばして本編を再開する */
   | { type: 'skipPlayback' }
@@ -252,6 +269,9 @@ function advanceReplacement(state: FlowState, battle: BattleState): FlowState {
  * 何が起きたのか見えないまま盤面だけが変わる。再生が終わってから再開する。
  *
  * イベントが1件もなければ再生することがないので、そのまま本編を進める。
+ *
+ * 対人戦は `awaitingStart` で一度止まる。片方が宣言した直後に再生を始めると、
+ * 端末を持っていないもう一方が解決を見逃すため。
  */
 function startPlayback(
   state: FlowState,
@@ -263,7 +283,12 @@ function startPlayback(
   if (events.length === 0) return advance({ ...state, log });
 
   const frames = buildFrames(before, events, state.revealed, sideLabels(state.mode));
-  return { ...state, log, playback: { frames, index: 0 }, turn: null };
+  return {
+    ...state,
+    log,
+    playback: { before, frames, index: 0, awaitingStart: state.mode === 'hotseat' },
+    turn: null,
+  };
 }
 
 /**
@@ -340,6 +365,10 @@ export function reduce(state: FlowState, event: FlowEvent): FlowState {
     case 'advancePlayback': {
       const playback = state.playback;
       if (!playback) return state;
+      // 開始待ちなら「再生する」の意味になる。コマは進めない
+      if (playback.awaitingStart) {
+        return { ...state, playback: { ...playback, awaitingStart: false } };
+      }
       const next = playback.index + 1;
       // 末尾を過ぎたら本編を再開する
       if (next >= playback.frames.length) return finishPlayback(state);
@@ -375,26 +404,22 @@ function setParty(state: FlowState, party: UnitId[]): FlowState {
     return { ...state, parties, screen: { kind: 'party', side: OPPONENT } };
   }
 
+  // 編成が揃ったら公開画面を挟まずに選出へ進む。相手の5体は選出画面に並ぶ
   if (state.mode === 'ai') {
     const drafted = draftParty(state.rngSeed);
     return {
       ...state,
       parties: { ...parties, [OPPONENT]: drafted.party },
       rngSeed: drafted.seed,
-      screen: { kind: 'reveal' },
+      screen: { kind: 'select', side: HUMAN },
     };
   }
 
-  return { ...state, parties, screen: { kind: 'reveal' } };
+  return { ...state, parties, screen: { kind: 'selectGate', side: HUMAN } };
 }
 
 function confirmGate(state: FlowState): FlowState {
   // 選出前のゲート
-  if (state.screen.kind === 'reveal') {
-    return state.mode === 'hotseat'
-      ? { ...state, screen: { kind: 'selectGate', side: HUMAN } }
-      : { ...state, screen: { kind: 'select', side: HUMAN } };
-  }
   if (state.screen.kind === 'selectGate') {
     return { ...state, screen: { kind: 'select', side: state.screen.side } };
   }
@@ -450,6 +475,9 @@ function setTeam(state: FlowState, team: UnitId[]): FlowState {
 
 /** いま画面に出すべき盤面 */
 export function displayBattle(state: FlowState): BattleState | null {
+  const playback = state.playback;
+  // 開始待ちは解決前の絵。state.battle は既に解決後なので、そのまま出すと結果が先に見える
+  if (playback?.awaitingStart) return playback.before;
   const frame = currentFrame(state);
   return frame ? frame.battle : state.battle;
 }
@@ -457,7 +485,7 @@ export function displayBattle(state: FlowState): BattleState | null {
 /** いま画面に出すべきログ。再生中は再生済みのぶんだけ */
 export function displayLog(state: FlowState): LogEntry[] {
   const playback = state.playback;
-  if (!playback) return state.log;
+  if (!playback || playback.awaitingStart) return state.log;
   return [...state.log, ...playback.frames.slice(0, playback.index + 1).map((f) => f.entry)];
 }
 
@@ -467,23 +495,32 @@ export function displayRevealed(state: FlowState): Record<Side, number[]> {
   return frame ? frame.revealed : state.revealed;
 }
 
-/** 再生中のコマ。エフェクトの元になる */
+/** 再生中のコマ。エフェクトの元になる。開始待ちの間は何も再生していない */
 export function currentFrame(state: FlowState): Frame | null {
   const playback = state.playback;
-  return playback ? (playback.frames[playback.index] ?? null) : null;
+  if (!playback || playback.awaitingStart) return null;
+  return playback.frames[playback.index] ?? null;
 }
 
+/** 再生の最中、または開始待ち。どちらも行動入力は受け付けない */
 export function isPlaying(state: FlowState): boolean {
   return state.playback !== null;
 }
 
-/** ゲート画面に出す文言 */
+/** 「2人とも画面を見ていますか?」で止まっているか (対人戦のみ) */
+export function isAwaitingPlayback(state: FlowState): boolean {
+  return state.playback?.awaitingStart === true;
+}
+
+/**
+ * 全画面のゲートに出す文言。**選出前だけ**。
+ *
+ * バトル中のゲートは全画面にしない (→ components/PanelGate)。
+ * 盤面まで消してしまうと、解決を見終わった瞬間に結果が画面から消える。
+ */
 export function gateMessage(state: FlowState): string | null {
   if (state.screen.kind === 'selectGate') {
     return `${HOTSEAT_LABELS[state.screen.side]} の選出です`;
-  }
-  if (state.turn?.kind === 'actionGate' || state.turn?.kind === 'replacementGate') {
-    return `${HOTSEAT_LABELS[state.turn.side]} の入力です`;
   }
   return null;
 }
@@ -499,10 +536,13 @@ export function activeInputSide(state: FlowState): Side | null {
 /**
  * そのユニットの中身を見せてよいか (SPEC §11)。
  *
- * 隠すのは「相手の控えの中身」だけ。次の場合は常に公開する:
+ * 隠すのは「相手の控えの中身」だけ。次の場合は公開する:
  * - 自分の陣営
- * - AI戦(相手の編成は reveal 画面で公開済み)
  * - **一度でも場に出たユニット**(控えに戻っても公開し続ける)
+ *
+ * **AI戦でも相手の控えは隠す。** 選出画面で公開されるのはパーティー5体であって、
+ * そこから選ばれた3体ではない。以前はここで無条件に公開しており、
+ * 試合開始時点で相手の選出が読めてしまっていた。
  */
 export function isUnitVisible(
   state: FlowState,
@@ -510,8 +550,9 @@ export function isUnitVisible(
   partyIndex: number,
   viewer: Side | null,
 ): boolean {
-  if (state.mode === 'ai') return true;
-  if (viewer === side) return true;
+  // AI戦の観戦者は常に人間 (p1)。対人戦は入力中の陣営が観戦者になる
+  const seat = state.mode === 'ai' ? HUMAN : viewer;
+  if (seat === side) return true;
   return displayRevealed(state)[side].includes(partyIndex);
 }
 

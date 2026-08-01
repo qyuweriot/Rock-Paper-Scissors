@@ -1,6 +1,11 @@
 /**
  * 選出 (PLAN §283)。自分の5体から TEAM_SIZE 体を選ぶ (SPEC §1)。
- * 相手のパーティー5体を並べて見ながら選べるようにする。
+ *
+ * **左が p1、右が p2 で固定**する。バトル画面と同じ並びにして、
+ * 席が移っても配置が動かないようにする。
+ *
+ * 相手側の列は5体を並べるだけで、**どの3体を選んだかは出さない** ─
+ * パーティーは相互公開されるが (SPEC §1)、選出の内容は秘匿対象 (SPEC §11)。
  */
 
 import { useState } from 'react';
@@ -8,6 +13,10 @@ import type { UnitId } from '../../data/units';
 import { TEAM_SIZE } from '../../engine/constants';
 import type { Side } from '../../engine/types';
 import { UnitCard } from '../components/UnitCard';
+import { UnitDetail } from '../components/UnitDetail';
+
+/** 左から右への並び。バトル画面の BattleStage と揃える */
+const ORDER: readonly Side[] = ['p1', 'p2'];
 
 interface Props {
   side: Side;
@@ -20,6 +29,7 @@ interface Props {
 
 export function SelectionScreen({ side, own, opponent, labels, showSide, onSubmit }: Props) {
   const [team, setTeam] = useState<UnitId[]>([]);
+  const [detail, setDetail] = useState<UnitId | null>(null);
 
   const toggle = (id: UnitId) => {
     setTeam((current) =>
@@ -32,7 +42,7 @@ export function SelectionScreen({ side, own, opponent, labels, showSide, onSubmi
   };
 
   const full = team.length === TEAM_SIZE;
-  const opponentSide: Side = side === 'p1' ? 'p2' : 'p1';
+  const partyOf = (target: Side) => (target === side ? own : opponent);
 
   return (
     <div className="screen screen--select">
@@ -57,34 +67,50 @@ export function SelectionScreen({ side, own, opponent, labels, showSide, onSubmi
         </div>
       </header>
 
-      <section className="select-block">
-        <h3>{labels[opponentSide]} の編成</h3>
-        <div className="unit-grid unit-grid--compact">
-          {opponent.map((id) => (
-            <UnitCard key={id} unitId={id} compact />
-          ))}
-        </div>
-      </section>
+      <div className="select-stage">
+        {ORDER.map((column, order) => {
+          const mine = column === side;
+          return (
+            <section
+              key={column}
+              className={`select-column select-column--${order === 0 ? 'left' : 'right'} ${
+                mine ? 'is-active' : ''
+              }`}
+            >
+              <h3>
+                {labels[column]}
+                {mine && <em className="select-column__you">あなた</em>}
+              </h3>
 
-      <section className="select-block">
-        <h3>自分の編成</h3>
-        <div className="unit-grid">
-          {own.map((id) => {
-            const order = team.indexOf(id);
-            return (
-              <div key={id} className="select-slot">
-                {order >= 0 && <span className="select-slot__order">{order + 1}</span>}
-                <UnitCard
-                  unitId={id}
-                  selected={order >= 0}
-                  disabled={order < 0 && full}
-                  onClick={() => toggle(id)}
-                />
+              <div className="unit-grid unit-grid--column">
+                {partyOf(column).map((id) => {
+                  // 相手の列は読むだけ。押すと詳細が開く。
+                  // 専用の公開画面をなくしたので、ここで技・特性まで並べる
+                  if (!mine) {
+                    return <UnitCard key={id} unitId={id} onClick={() => setDetail(id)} />;
+                  }
+                  const pick = team.indexOf(id);
+                  return (
+                    <div key={id} className="select-slot">
+                      {pick >= 0 && <span className="select-slot__order">{pick + 1}</span>}
+                      <UnitCard
+                        unitId={id}
+                        selected={pick >= 0}
+                        disabled={pick < 0 && full}
+                        onClick={() => toggle(id)}
+                      />
+                    </div>
+                  );
+                })}
               </div>
-            );
-          })}
-        </div>
-      </section>
+
+              {!mine && <p className="select-column__note">カードを押すと大きく読めます</p>}
+            </section>
+          );
+        })}
+      </div>
+
+      {detail && <UnitDetail unitId={detail} onClose={() => setDetail(null)} />}
     </div>
   );
 }

@@ -219,3 +219,59 @@ describe('個別仕様の反映 (SPEC §10)', () => {
     expect(fixed).toEqual(['tenohira:0']);
   });
 });
+
+/**
+ * `previewPower` は UI が「いまの威力」を出すための表示専用の宣言。
+ * **解決に使う `onModifyPower` と規則がズレたら、画面の数値が嘘になる。**
+ * 両者が同じ結果を返すことをここで固定する。
+ */
+describe('previewPower — 解決と表示で規則が一致する', () => {
+  /** api を呼ばないことが前提。呼んだら即座に落として気づけるようにする */
+  const forbiddenApi = new Proxy(
+    {},
+    {
+      get(_target, key) {
+        throw new Error(`previewPower の検証中に api.${String(key)} が呼ばれました`);
+      },
+    },
+  ) as never;
+
+  it('宣言しているのは累積で威力が決まる技だけ (魔球・カマキリ)', () => {
+    const declared: string[] = [];
+    for (const unit of UNIT_LIST) {
+      unit.slots.forEach((slot, index) => {
+        if (slot.kind === 'move' && slot.move.hooks?.previewPower) {
+          declared.push(`${unit.id}:${String(index)}`);
+        }
+      });
+    }
+    // 鉄拳の追い討ちは相手の宣言に依存するので宣言できない (SPEC §10.2)
+    expect(declared.sort()).toEqual(['kamakiri:0', 'magyu:0']);
+  });
+
+  it('使用回数 0〜5 で onModifyPower と同じ値になる', () => {
+    for (const unit of UNIT_LIST) {
+      unit.slots.forEach((slot, index) => {
+        if (slot.kind !== 'move') return;
+        const { previewPower, onModifyPower } = slot.move.hooks ?? {};
+        if (!previewPower || !onModifyPower) return;
+        if (slot.move.damage.kind !== 'normal') return;
+
+        const base = slot.move.damage.power;
+        for (let useCount = 0; useCount <= 5; useCount++) {
+          expect(previewPower(base, useCount)).toBe(
+            onModifyPower({
+              api: forbiddenApi,
+              self: { side: 'p1', partyIndex: 0 },
+              target: { side: 'p2', partyIndex: 0 },
+              slotIndex: index as 0 | 1,
+              power: base,
+              useCount,
+              targetDeclaredSwitch: false,
+            }),
+          );
+        }
+      });
+    }
+  });
+});

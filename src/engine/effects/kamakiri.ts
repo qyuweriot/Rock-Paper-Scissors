@@ -3,12 +3,17 @@
 import { KAMAKIRI_POWER_GROWTH } from '../constants';
 import type { EffectHooks } from './context';
 
+/** 連撃の威力。解決と UI の表示が同じ式を通るよう、規則はここ1か所に置く */
+const growth = (power: number, useCount: number): number =>
+  power + KAMAKIRI_POWER_GROWTH * useCount;
+
 /**
  * 技1「連撃」: 使うたびに威力+5。上限なし。
  * 交代でのリセットは battle.ts の resetVolatile が担う (SPEC §7.3)。
  */
 export const kamakiriGrowth: EffectHooks = {
-  onModifyPower: ({ power, useCount }) => power + KAMAKIRI_POWER_GROWTH * useCount,
+  onModifyPower: ({ power, useCount }) => growth(power, useCount),
+  previewPower: growth,
 };
 
 /**

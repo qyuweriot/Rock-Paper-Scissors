@@ -277,6 +277,93 @@ describe('effectOf — コマから演出を導く', () => {
   });
 });
 
+/**
+ * 相性補正 (SPEC §2)。同じ技でも25も動くのに、数値だけでは理由が分からない。
+ * **乗る対象を取り違えないことが要点** ─ 固定ダメージと毒・設置・反動・反射は対象外 (SPEC §4.2)。
+ */
+describe('effectOf — 相性補正', () => {
+  /** 実際に1ターン解決して、最初の攻撃ダメージのコマを取り出す */
+  const firstMoveDamage = (p1: Parameters<typeof makeBattle>[0], p2: Parameters<typeof makeBattle>[1], slot: 0 | 1 = 0) => {
+    const state = makeBattle(p1, p2);
+    const { events } = resolveTurn(state, { p1: move(slot), p2: move(0) });
+    const frames = buildFrames(state, events, noRevealed(), HOTSEAT_LABELS);
+    const frame = frames.find(
+      (f) => f.event.type === 'damage' && f.event.source === 'move' && f.event.target.side === 'p2',
+    );
+    if (!frame) throw new Error('攻撃ダメージのコマがありません');
+    return effectOf(frame);
+  };
+
+  it('有利対面は advantage と +25 を持つ', () => {
+    // 石 gu → バラ choki
+    expect(firstMoveDamage(['ishi'], ['bara'])).toMatchObject({
+      matchup: 'advantage',
+      typeModifier: 25,
+    });
+  });
+
+  it('不利対面は disadvantage と −10 を持つ', () => {
+    // 石 gu → 手のひら pa
+    expect(firstMoveDamage(['ishi'], ['tenohira'])).toMatchObject({
+      matchup: 'disadvantage',
+      typeModifier: -10,
+    });
+  });
+
+  it('互角対面は補正の値を出さない。見せたいのは動いた理由だけ', () => {
+    // 石 gu → 鉄拳 gu
+    expect(firstMoveDamage(['ishi'], ['tekken'])).toMatchObject({
+      matchup: 'neutral',
+      typeModifier: null,
+    });
+  });
+
+  it('固定ダメージには相性が乗らない (SPEC §4.2)', () => {
+    // 手のひら 技0 は固定20。相手が有利対面でも相性は付かない
+    expect(firstMoveDamage(['tenohira'], ['ishi'])).toMatchObject({ matchup: null });
+  });
+
+  it('反動・反射・毒・設置には相性が乗らない (SPEC §4.2 / §7.4)', () => {
+    // 粉砕 gu → 山嵐 choki。有利対面で殴り、反動と反射が同時に出る
+    const state = makeBattle(['funsai'], ['yamaarashi']);
+    setHp(state, 'p2', 0, 140); // 一撃で倒れないようにして反動を出す
+    const { events } = resolveTurn(state, { p1: move(0), p2: move(0) });
+    const frames = buildFrames(state, events, noRevealed(), HOTSEAT_LABELS);
+
+    for (const frame of frames) {
+      if (frame.event.type !== 'damage') continue;
+      const effect = effectOf(frame);
+      if (frame.event.source === 'move') {
+        expect(effect?.matchup).not.toBeNull();
+      } else {
+        expect(effect?.matchup).toBeNull();
+      }
+    }
+  });
+
+  /**
+   * 同じ段で両者が動くと `moveUsed(p1) → moveUsed(p2) → damage → damage` の順に並ぶ。
+   * 「直近の moveUsed」で引くと攻撃者を取り違えるので、陣営ごとに持つ必要がある。
+   */
+  it('同じ段で両者が殴っても、攻撃者を取り違えない', () => {
+    // 手のひら pa(中・固定20) と 石 gu(中・通常25)。どちらも中速なので同じ段になる
+    const state = makeBattle(['tenohira'], ['ishi']);
+    const { events } = resolveTurn(state, { p1: move(0), p2: move(0) });
+    const frames = buildFrames(state, events, noRevealed(), HOTSEAT_LABELS);
+
+    const hits = frames.filter((f) => f.event.type === 'damage' && f.event.source === 'move');
+    expect(hits).toHaveLength(2);
+
+    for (const frame of hits) {
+      if (frame.event.type !== 'damage') continue;
+      const effect = effectOf(frame);
+      // 手のひらが受けたぶんは石の通常技 → 相性が付く
+      // 石が受けたぶんは手のひらの固定ダメージ → 相性は付かない
+      expect(effect?.matchup === null).toBe(frame.event.target.side === 'p2');
+    }
+  });
+});
+
 describe('設置ダメージも再生できる (SPEC §7.2)', () => {
   it('交代 → 設置ダメージ の連鎖がコマとして並ぶ', () => {
     const state = makeBattle(['ishi', 'bara'], ['kenro']);

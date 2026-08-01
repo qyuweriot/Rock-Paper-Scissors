@@ -13,7 +13,6 @@ import {
   gateMessage,
   HUMAN,
   initialState,
-  isPlaying,
   reduce,
   sideLabels,
   type FlowState,
@@ -24,7 +23,6 @@ import { BattleScreen } from './screens/BattleScreen';
 import { ModeScreen } from './screens/ModeScreen';
 import { PartyScreen } from './screens/PartyScreen';
 import { ResultScreen } from './screens/ResultScreen';
-import { RevealScreen } from './screens/RevealScreen';
 import { SelectionScreen } from './screens/SelectionScreen';
 
 /**
@@ -54,11 +52,12 @@ export function App() {
   const battle = displayBattle(state);
 
   /**
-   * 秘匿ゲートは画面の種類より優先する。前の入力を必ず隠す (SPEC §11)。
-   * 再生中はゲートを出さない ─ 出すと解決の様子が見えなくなる。
+   * 選出前の秘匿ゲートだけが全画面 (SPEC §11)。まだ盤面がないので隠すものがない。
+   * **バトル中のゲートは全画面にしない** ─ 盤面まで消すと、解決を見終わった瞬間に
+   * 結果が画面から消えてしまう。あちらは操作欄に出す (BattleScreen の PanelGate)。
    */
   const gate = gateMessage(state);
-  if (gate && !isPlaying(state) && (screen.kind === 'selectGate' || screen.kind === 'battle')) {
+  if (gate) {
     return (
       <main className="app">
         <HandoffGate message={gate} onConfirm={() => dispatch({ type: 'confirmGate' })} />
@@ -78,14 +77,6 @@ export function App() {
           side={screen.side}
           showSide={state.mode === 'hotseat'}
           onSubmit={(party) => dispatch({ type: 'setParty', party })}
-        />
-      )}
-
-      {screen.kind === 'reveal' && (
-        <RevealScreen
-          parties={state.parties}
-          labels={labels}
-          onConfirm={() => dispatch({ type: 'confirmGate' })}
         />
       )}
 
@@ -110,6 +101,8 @@ export function App() {
           onDeclareReplacement={(partyIndex) =>
             dispatch({ type: 'declareReplacement', partyIndex })
           }
+          onConfirmGate={() => dispatch({ type: 'confirmGate' })}
+          onStartPlayback={() => dispatch({ type: 'advancePlayback' })}
           onSkipPlayback={() => dispatch({ type: 'skipPlayback' })}
         />
       )}

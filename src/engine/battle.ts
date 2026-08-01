@@ -112,7 +112,8 @@ function opponentOf(side: Side): Side {
   return side === 'p1' ? 'p2' : 'p1';
 }
 
-function totalModifier(unit: UnitState, axis: ModifierAxis): number {
+/** 修正値の合計 (SPEC §4.3)。UI のダメージ表示も同じ式を通す */
+export function totalModifier(unit: UnitState, axis: ModifierAxis): number {
   return unit.modifiers[axis] + unit.turnModifiers[axis];
 }
 

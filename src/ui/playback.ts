@@ -14,8 +14,16 @@
  */
 
 import { getUnitDef } from '../engine/battle';
-import type { BattleEvent, BattleState, Side, UnitRef } from '../engine/types';
+import { getMatchup, getTypeModifier, type Matchup } from '../engine/damage';
+import { getMove } from '../data/units';
+import type { BattleEvent, BattleState, Side, SlotIndex, UnitRef } from '../engine/types';
 import { formatEvent, type LogEntry, type SideLabels } from './log';
+
+/** 宣言された技。`damage` イベントだけでは誰の何が当たったのか分からない */
+export interface InFlight {
+  attacker: UnitRef;
+  slotIndex: SlotIndex;
+}
 
 export interface Frame {
   /** このステップ時点の盤面。**表示専用** */
@@ -28,6 +36,15 @@ export interface Frame {
    * 解決時に一括更新すると、交代のコマが再生される前に相手の控えが見えてしまう。
    */
   revealed: Record<Side, number[]>;
+  /**
+   * このターンに宣言された技を陣営ごとに引く。相性補正を出すのに使う。
+   *
+   * **「直近の moveUsed」では取り違える。** 同じ段で両者が動くと
+   * `moveUsed(p1) → moveUsed(p2) → damage(p2へ) → damage(p1へ)` の順に並ぶため、
+   * p2 が受けたダメージの直前にあるのは p2 自身の技になってしまう。
+   * 1ターンに1陣営1回しか技を使わない (SPEC §5.1) ので、陣営で引けば一意に定まる。
+   */
+  moves: Partial<Record<Side, InFlight>>;
 }
 
 function unitAt(state: BattleState, ref: UnitRef) {
@@ -139,12 +156,24 @@ export function buildFrames(
   const frames: Frame[] = [];
   let battle = before;
   let seen = revealed;
+  let moves: Partial<Record<Side, InFlight>> = {};
 
   for (const event of events) {
+    // 技の宣言はダメージより先に出る。誰の技が当たったのかを陣営ごとに覚えておく
+    if (event.type === 'moveUsed') {
+      moves = { ...moves, [event.user.side]: { attacker: event.user, slotIndex: event.slotIndex } };
+    }
+
     battle = applyEvent(battle, event);
     seen = withRevealed(seen, event);
     // ログの整形にはそのコマ時点の盤面を渡す。unitId は変わらないので名前は正しく引ける
-    frames.push({ battle, event, entry: formatEvent(event, battle, labels), revealed: seen });
+    frames.push({
+      battle,
+      event,
+      entry: formatEvent(event, battle, labels),
+      revealed: seen,
+      moves,
+    });
   }
 
   return frames;
@@ -160,6 +189,13 @@ export interface Effect {
   amount: number | null;
   /** ダメージの発生源。毒/設置/反動/反射を数値の脇に出す */
   note: string | null;
+  /**
+   * 相性補正 (SPEC §2)。**通常ダメージの攻撃技だけ**が持つ。
+   * 固定ダメージ・毒・設置・反動・反射は相性の対象外 (SPEC §4.2 / §7.4)。
+   */
+  matchup: Matchup | null;
+  /** 相性補正の値 (+25 / −10)。互角と対象外は null */
+  typeModifier: number | null;
 }
 
 /** ダメージの発生源を数値の脇に出す。通常攻撃は注記なし */
@@ -171,30 +207,76 @@ const SOURCE_NOTES = {
   reflect: '反射',
 } as const;
 
+/** 相性を持たない演出の共通部分 */
+const NO_MATCHUP = { matchup: null, typeModifier: null } as const;
+
+/**
+ * そのダメージに相性補正が乗っていたか (SPEC §2)。乗っていなければ null。
+ *
+ * 乗るのは**攻撃技による通常ダメージだけ**。固定ダメージ (手のひら技1) と
+ * 毒・設置・反動・反射は相性を無視する (SPEC §4.2)。
+ * 判定に `source` と `damage.kind` の両方が要るのはそのため。
+ *
+ * 攻撃者は「被弾側の相手が宣言した技」から引く。反動は自分が対象になるが、
+ * `source === 'move'` で先に弾いているのでここには来ない。
+ */
+function matchupOf(frame: Frame): { matchup: Matchup; typeModifier: number } | null {
+  const { event, moves, battle } = frame;
+  if (event.type !== 'damage' || event.source !== 'move') return null;
+
+  const target = event.target;
+  const inFlight = moves[target.side === 'p1' ? 'p2' : 'p1'];
+  if (!inFlight) return null;
+
+  const attacker = battle.sides[inFlight.attacker.side].party[inFlight.attacker.partyIndex];
+  const defender = battle.sides[target.side].party[target.partyIndex];
+  if (!attacker || !defender) return null;
+
+  const attackerDef = getUnitDef(attacker);
+  if (getMove(attackerDef, inFlight.slotIndex).damage.kind !== 'normal') return null;
+
+  const defenderDef = getUnitDef(defender);
+  return {
+    matchup: getMatchup(attackerDef.attribute, defenderDef.attribute),
+    typeModifier: getTypeModifier(attackerDef.attribute, defenderDef.attribute),
+  };
+}
+
 /** コマから演出を導く。演出のないイベントは null */
 export function effectOf(frame: Frame): Effect | null {
   const { event } = frame;
 
   switch (event.type) {
-    case 'damage':
+    case 'damage': {
+      const type = matchupOf(frame);
       return {
         target: event.target,
         kind: 'damage',
         amount: event.amount,
         note: SOURCE_NOTES[event.source],
+        matchup: type?.matchup ?? null,
+        // 互角は 0 なので出さない。見せたいのは「なぜ数値が動いたか」だけ
+        typeModifier: type && type.matchup !== 'neutral' ? type.typeModifier : null,
       };
+    }
 
     case 'heal':
-      return { target: event.target, kind: 'heal', amount: event.amount, note: null };
+      return { target: event.target, kind: 'heal', amount: event.amount, note: null, ...NO_MATCHUP };
 
     case 'faint':
-      return { target: event.target, kind: 'faint', amount: null, note: null };
+      return { target: event.target, kind: 'faint', amount: null, note: null, ...NO_MATCHUP };
 
     case 'switch':
-      return { target: event.to, kind: 'switch', amount: null, note: null };
+      return { target: event.to, kind: 'switch', amount: null, note: null, ...NO_MATCHUP };
 
     case 'poisonApplied':
-      return { target: event.target, kind: 'poison', amount: event.stacks, note: '毒' };
+      return {
+        target: event.target,
+        kind: 'poison',
+        amount: event.stacks,
+        note: '毒',
+        ...NO_MATCHUP,
+      };
 
     case 'modifier':
       return {
@@ -202,6 +284,7 @@ export function effectOf(frame: Frame): Effect | null {
         kind: 'modifier',
         amount: event.value,
         note: event.axis === 'atk' ? '攻勢' : '守勢',
+        ...NO_MATCHUP,
       };
 
     default:

@@ -107,6 +107,17 @@ export interface RecoilContext extends HookContext {
 export interface EffectHooks {
   /** 威力を書き換える。魔球の減衰 / カマキリの増強 / 鉄拳の追い討ち */
   onModifyPower?: (ctx: PowerContext) => number;
+  /**
+   * 使用回数だけで決まる現在の威力。**表示専用**で、解決には一切使わない。
+   *
+   * 累積で威力が変わる技 (魔球・カマキリ) は、データ上の初期値を出しても意味がない。
+   * UI がユニットごとの分岐を持たずに現在値を引けるよう、規則をここに宣言する。
+   *
+   * **`onModifyPower` と同じ関数を渡すこと。** 規則を二重に書くとズレる
+   * (両者が一致することは units.test.ts で固定してある)。
+   * 相手の宣言に依存する補正 (鉄拳の追い討ち) は使用回数だけでは決まらないので宣言しない。
+   */
+  previewPower?: (power: number, useCount: number) => number;
   /** 技の副作用。修正値・回復・毒・設置・交代 */
   onUse?: (ctx: UseContext) => void;
   /** 攻撃技のダメージを受けた。山嵐の反射 (SPEC §10.7) */

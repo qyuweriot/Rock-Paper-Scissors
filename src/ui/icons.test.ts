@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { HIDDEN_ICON, UNIT_ICONS } from './icons';
-import { PLAYBACK_MS, playbackDurationOf } from './constants';
+import { PLAYBACK_MS, PLAYBACK_SCALE, playbackDurationOf } from './constants';
 import { UNIT_IDS } from '../data/units';
 
 describe('UNIT_ICONS', () => {
@@ -48,9 +48,32 @@ describe('PLAYBACK_MS', () => {
     }
   });
 
-  it('1ターン最大9コマでも合計が10秒を超えない', () => {
+  it('1ターン最大9コマでも合計が15秒を超えない', () => {
+    // 意図的に遅くしてある (PLAYBACK_SCALE)。上限は「待たされすぎない」ための歯止め
     const longest = Math.max(...Object.values(PLAYBACK_MS));
-    expect(longest * 9).toBeLessThan(10_000);
+    expect(longest * 9).toBeLessThan(15_000);
+  });
+
+  /**
+   * **アニメーションはコマの表示時間より短く保つ。**
+   * 長いとコマが変わった瞬間に要素ごと消え、演出が途中で切られる
+   * (ダメージ数値が読めなかった原因がこれ)。
+   * index.css の実際の尺と対応させてあるので、片方だけ変えると落ちる。
+   */
+  it('各コマは CSS のアニメーションを切らない長さがある', () => {
+    // [イベント種別, index.css で --fx に掛けている ms]
+    const animations: [keyof typeof PLAYBACK_MS, number][] = [
+      ['damage', 590], // float-up
+      ['heal', 540], // pulse
+      ['faint', 850], // collapse
+      ['switch', 620], // slide-in
+      ['poisonApplied', 480], // pulse-poison
+      ['modifier', 480], // pulse-mod
+    ];
+
+    for (const [type, baseMs] of animations) {
+      expect(baseMs * PLAYBACK_SCALE, `${type} の演出`).toBeLessThanOrEqual(PLAYBACK_MS[type]);
+    }
   });
 
   it('瀕死は最も長く止まる。見逃されると何が起きたか分からない', () => {

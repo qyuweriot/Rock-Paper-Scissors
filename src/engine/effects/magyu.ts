@@ -3,6 +3,10 @@
 import { MAGYU_POWER_DECAY } from '../constants';
 import type { EffectHooks } from './context';
 
+/** 消耗弾の威力。解決と UI の表示が同じ式を通るよう、規則はここ1か所に置く */
+const decay = (power: number, useCount: number): number =>
+  Math.max(0, power - MAGYU_POWER_DECAY * useCount);
+
 /**
  * 技1「消耗弾」: 使うたびに威力−10。下限0。
  *
@@ -11,7 +15,8 @@ import type { EffectHooks } from './context';
  * 交代でのリセットは battle.ts の resetVolatile が担う (SPEC §7.3)。
  */
 export const magyuDecay: EffectHooks = {
-  onModifyPower: ({ power, useCount }) => Math.max(0, power - MAGYU_POWER_DECAY * useCount),
+  onModifyPower: ({ power, useCount }) => decay(power, useCount),
+  previewPower: decay,
 };
 
 /**

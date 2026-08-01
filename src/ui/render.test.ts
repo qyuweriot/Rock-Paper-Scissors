@@ -15,7 +15,6 @@ import { renderToStaticMarkup } from 'react-dom/server';
 
 import { ModeScreen } from './screens/ModeScreen';
 import { PartyScreen } from './screens/PartyScreen';
-import { RevealScreen } from './screens/RevealScreen';
 import { SelectionScreen } from './screens/SelectionScreen';
 import { BattleScreen } from './screens/BattleScreen';
 import { ResultScreen } from './screens/ResultScreen';
@@ -24,6 +23,7 @@ import {
   currentFrame,
   displayBattle,
   initialState,
+  isAwaitingPlayback,
   isPlaying,
   legalActionsFor,
   reduce,
@@ -32,7 +32,7 @@ import {
   type FlowEvent,
   type FlowState,
 } from './flow';
-import type { UnitId } from '../data/units';
+import { getUnit, type UnitId } from '../data/units';
 import { UNIT_ICONS } from './icons';
 
 const PARTY_A: UnitId[] = ['ishi', 'kenro', 'kami', 'utsuwa', 'magyu'];
@@ -75,6 +75,8 @@ const battleProps = (state: FlowState, mode: 'ai' | 'hotseat') => {
     labels: sideLabels(mode),
     onDeclareAction: noop,
     onDeclareReplacement: noop,
+    onConfirmGate: noop,
+    onStartPlayback: noop,
     onSkipPlayback: noop,
   };
 };
@@ -97,15 +99,6 @@ describe('画面の描画', () => {
     expect(html).toContain('おまかせ');
   });
 
-  it('編成の公開', () => {
-    const html = renderToStaticMarkup(
-      h(RevealScreen, { parties: { p1: PARTY_A, p2: PARTY_B }, labels: sideLabels('hotseat'), onConfirm: noop }),
-    );
-    expect(html).toContain('編成の公開');
-    expect(html).toContain('石');
-    expect(html).toContain('はさみ');
-  });
-
   it('選出。相手の編成を見ながら選べる', () => {
     const html = renderToStaticMarkup(
       h(SelectionScreen, {
@@ -118,7 +111,40 @@ describe('画面の描画', () => {
       }),
     );
     expect(html).toContain('プレイヤー1 の選出');
-    expect(html).toContain('自分の編成');
+    // 左右に分かれ、自分の側に印が付く
+    expect(html).toContain('select-column--left');
+    expect(html).toContain('select-column--right');
+    expect(html).toContain('あなた');
+    // 公開画面をなくしたぶん、相手の技・特性までここで読める
+    expect(html).toContain('はさみ');
+    expect(html).toContain('受け切り'); // はさみ 技2 の名前
+    expect(html).toContain('瀕死になったとき'); // ゴースト 特性の効果テキスト
+  });
+
+  /** 席が移っても配置が動かないこと。左は常に p1、右は常に p2 */
+  it('選出画面の左右は、どちらの手番でも入れ替わらない', () => {
+    const render = (side: 'p1' | 'p2') =>
+      renderToStaticMarkup(
+        h(SelectionScreen, {
+          side,
+          own: side === 'p1' ? PARTY_A : PARTY_B,
+          opponent: side === 'p1' ? PARTY_B : PARTY_A,
+          labels: sideLabels('hotseat'),
+          showSide: true,
+          onSubmit: noop,
+        }),
+      );
+
+    for (const side of ['p1', 'p2'] as const) {
+      // 見出しの「プレイヤーNの選出」を除き、2つの列だけを見る
+      const stage = render(side).slice(render(side).indexOf('select-stage'));
+
+      expect(stage.indexOf('select-column--left')).toBeLessThan(
+        stage.indexOf('select-column--right'),
+      );
+      // 左の列がプレイヤー1、右の列がプレイヤー2
+      expect(stage.indexOf('プレイヤー1')).toBeLessThan(stage.indexOf('プレイヤー2'));
+    }
   });
 
   it('秘匿ゲート (SPEC §11)', () => {
@@ -248,5 +274,142 @@ describe('AI戦を通しで完走できる (PLAN §301)', () => {
     expect(html).not.toContain('の行動を選んでください');
     // いま何が起きているかが中央に出る
     expect(html).toContain(currentFrame(playing)?.entry.text ?? '');
+  });
+});
+
+describe('今回足した表示', () => {
+  it('左右のステージ。左が p1、右が p2 で固定 (手番で入れ替わらない)', () => {
+    for (const mode of ['ai', 'hotseat'] as const) {
+      const html = renderToStaticMarkup(h(BattleScreen, battleProps(toBattle(mode), mode)));
+      const left = html.indexOf('stage__side--left');
+      const right = html.indexOf('stage__side--right');
+
+      expect(left).toBeGreaterThanOrEqual(0);
+      expect(left).toBeLessThan(right);
+      // 左の列に p1 の場のユニット (石) が入る
+      expect(html.slice(left, right)).toContain('石');
+    }
+  });
+
+  it('技に「いま打ったら何ダメージか」が出る', () => {
+    const html = renderToStaticMarkup(h(BattleScreen, battleProps(toBattle('ai'), 'ai')));
+    // 石 gu 技0 威力25 → はさみ choki は有利 (+25)
+    expect(html).toContain('→ 50');
+    expect(html).toContain('基本25 相性+25');
+  });
+
+  it('控えを押せるようになっている', () => {
+    const html = renderToStaticMarkup(h(BattleScreen, battleProps(toBattle('ai'), 'ai')));
+    expect(html).toContain('bench-dot__button');
+  });
+
+  it('毒を受けているとHPバーに消えるぶんが出る (SPEC §7.1)', () => {
+    const state = toBattle('ai');
+    const battle = displayBattle(state);
+    if (!battle) throw new Error('バトルが始まっていません');
+    // 表示だけの検証なので、盤面を直接汚して描く
+    const poisoned = structuredClone(battle);
+    poisoned.sides.p1.party[poisoned.sides.p1.activeIndex]!.poisonStacks = 2;
+
+    const html = renderToStaticMarkup(
+      h(BattleScreen, { ...battleProps(state, 'ai'), battle: poisoned }),
+    );
+    expect(html).toContain('hp__fill--poison');
+    expect(html).toContain('毒 −20');
+  });
+
+  it('対人戦は再生前に「2人とも画面を見ていますか?」で止まる', () => {
+    let state = toBattle('hotseat');
+    // 両者が宣言するまで進める
+    for (let i = 0; i < 4 && !isAwaitingPlayback(state); i++) {
+      const turn = state.turn;
+      if (turn?.kind === 'actionGate') {
+        state = reduce(state, { type: 'confirmGate' });
+      } else if (turn?.kind === 'awaitAction') {
+        const action = legalActionsFor(state, turn.side)[0];
+        if (!action) throw new Error('合法手がありません');
+        state = reduce(state, { type: 'declareAction', action });
+      }
+    }
+    expect(isAwaitingPlayback(state)).toBe(true);
+
+    const html = renderToStaticMarkup(h(BattleScreen, battleProps(state, 'hotseat')));
+    expect(html).toContain('2人とも画面を見ていますか');
+    expect(html).toContain('再生する');
+    // 確認中はスキップも行動選択も出ない
+    expect(html).not.toContain('スキップ');
+    expect(html).not.toContain('の行動を選んでください');
+  });
+
+  /**
+   * `.slot` はバッジ + 中身の2列グリッド。**中身を直接並べると崩れる** ─
+   * grid の自動配置に乗り、要素が増えたとき効果テキストが 2.4rem の列に
+   * 押し込まれて1文字ずつ折り返す(実際に起きた)。
+   */
+  it('技リストの中身が slot__body にまとまっている(段組み崩れの再発防止)', () => {
+    for (const html of [
+      renderToStaticMarkup(h(BattleScreen, battleProps(toBattle('ai'), 'ai'))),
+      renderToStaticMarkup(
+        h(SelectionScreen, {
+          side: 'p1',
+          own: PARTY_A,
+          opponent: PARTY_B,
+          labels: sideLabels('hotseat'),
+          showSide: true,
+          onSubmit: noop,
+        }),
+      ),
+    ]) {
+      // slot の直下に来てよいのは slot__kind と slot__body だけ
+      const slots = html.split('class="slot ').slice(1);
+      expect(slots.length).toBeGreaterThan(0);
+      for (const slot of slots) {
+        const upToBody = slot.slice(0, slot.indexOf('slot__body'));
+        expect(upToBody).toContain('slot__kind');
+        // 本文や内訳がバッジと同列に並んでいない
+        expect(upToBody).not.toContain('slot__text');
+        expect(upToBody).not.toContain('slot__breakdown');
+        expect(upToBody).not.toContain('slot__damage');
+      }
+    }
+  });
+
+  it('対人戦のゲート中も盤面が消えない(操作欄に出る)', () => {
+    // p1 が宣言すると p2 のゲートになる
+    const opened = toBattle('hotseat');
+    const action = legalActionsFor(opened, 'p1')[0];
+    if (!action) throw new Error('合法手がありません');
+    const state = reduce(opened, { type: 'declareAction', action });
+    expect(state.turn?.kind).toBe('actionGate');
+
+    const html = renderToStaticMarkup(h(BattleScreen, battleProps(state, 'hotseat')));
+    expect(html).toContain('panel-gate');
+    expect(html).toContain('プレイヤー2 の入力です');
+    // ステージ・HP・ログが出たまま
+    expect(html).toContain('stage__side--left');
+    expect(html).toContain('hp__track');
+    expect(html).toContain('バトルログ');
+    // ただし行動選択は出さない (SPEC §11)
+    expect(html).not.toContain('の行動を選んでください');
+  });
+
+  it('AI戦でも相手の控えが伏せられている (SPEC §11)', () => {
+    const state = toBattle('ai');
+    const battle = displayBattle(state);
+    if (!battle) throw new Error('バトルが始まっていません');
+    const html = renderToStaticMarkup(h(BattleScreen, battleProps(state, 'ai')));
+
+    expect(html).toContain('bench-dot--hidden');
+
+    // AI の選出は draftTeam が決めるので、盤面から名前を引いて突き合わせる
+    const p2 = battle.sides.p2;
+    p2.party.forEach((unit, index) => {
+      const name = getUnit(unit.unitId as UnitId).name;
+      if (index === p2.activeIndex) {
+        expect(html).toContain(name); // 場に出ているものは見える
+      } else {
+        expect(html).not.toContain(name); // 控えは伏せる
+      }
+    });
   });
 });

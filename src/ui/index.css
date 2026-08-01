@@ -17,6 +17,23 @@
   --danger: #e05c5c;
   --warn: #e0b25c;
   --ok: #5cc98a;
+
+  /*
+   * アニメーションの尺の倍率。**ui/constants.ts の PLAYBACK_SCALE と同じ値にすること。**
+   * コマの表示時間より長いアニメーションは、途中で要素ごと消えて切られる。
+   */
+  --fx: 1.45;
+}
+
+/*
+ * 全体サイズのつまみ。寸法はほぼ全て rem で書いてあるので、
+ * ここを変えると文字・余白・アイコン・角丸が一斉に伸び縮みする。
+ *
+ * **メディアクエリの rem はこの指定を見ない**(常に 16px 基準)。
+ * ここを上げたら、折り返す幅も併せて上げること。
+ */
+html {
+  font-size: 112.5%; /* = 18px */
 }
 
 *,
@@ -253,7 +270,7 @@ button.unit-card:disabled {
 
 .unit-card__icon {
   margin-right: 0.35rem;
-  font-size: 1.15rem;
+  font-size: 1.35rem;
   line-height: 1;
 }
 
@@ -282,6 +299,11 @@ button.unit-card:disabled {
   gap: 0.4rem;
 }
 
+/*
+ * バッジ + 中身の2列。**中身は必ず .slot__body でまとめる。**
+ * 直接子要素を並べると grid の自動配置に乗り、要素が増えたときに
+ * 本文が 2.4rem の列に押し込まれて1文字ずつ折り返す。
+ */
 .slot {
   display: grid;
   grid-template-columns: 2.4rem 1fr;
@@ -290,7 +312,6 @@ button.unit-card:disabled {
 }
 
 .slot__kind {
-  grid-row: span 2;
   align-self: start;
   padding: 0.05rem 0;
   text-align: center;
@@ -298,6 +319,19 @@ button.unit-card:disabled {
   background: var(--surface-2);
   color: var(--muted);
   font-size: 0.7rem;
+}
+
+.slot__body {
+  display: grid;
+  gap: 0.1rem;
+  min-width: 0;
+}
+
+.slot__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.4rem;
 }
 
 .slot--ability .slot__kind {
@@ -329,6 +363,7 @@ button.unit-card:disabled {
 
 .hp__track {
   flex: 1;
+  display: flex;
   height: 0.5rem;
   border-radius: 999px;
   background: #0f0f13;
@@ -348,6 +383,31 @@ button.unit-card:disabled {
 }
 .hp__fill--low {
   background: var(--danger);
+}
+
+/* ターン終了時に毒で消えるぶん (SPEC §7.1)。暗算させないための塗り分け */
+.hp__fill--poison {
+  background: repeating-linear-gradient(
+    -45deg,
+    #9a5cb0,
+    #9a5cb0 0.25rem,
+    #7a4590 0.25rem,
+    #7a4590 0.5rem
+  );
+}
+
+.hp__fill--poison.is-lethal {
+  animation: poison-warn 1.2s ease-in-out infinite;
+}
+
+@keyframes poison-warn {
+  50% { opacity: 0.45; }
+}
+
+.hp__poison {
+  margin-left: 0.3rem;
+  font-style: normal;
+  color: #d9a6e8;
 }
 
 .hp__text {
@@ -489,22 +549,50 @@ button.unit-card:disabled {
   cursor: pointer;
 }
 
+/*
+ * 左が p1、右が p2 で固定する。中央の帯は grid の3列目ではなく、
+ * 2列にまたがる行に置いて左右のあいだに挟む。
+ * **狭い画面でも段組みを崩さない** ─ 配置が動かないことが要件だから。
+ */
 .stage {
   display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-areas:
+    'left right'
+    'divider divider';
   gap: 0.5rem;
   margin-bottom: 1rem;
 }
 
 .stage__side {
   position: relative;
+  min-width: 0;
+}
+
+.stage__side--left {
+  grid-area: left;
+}
+.stage__side--right {
+  grid-area: right;
 }
 
 .stage__meta {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.4rem;
   flex-wrap: wrap;
   margin-bottom: 0.35rem;
+}
+
+/* 右の列は内容を右端に寄せて、中央で向かい合っているように見せる */
+.stage__side--right .stage__meta {
+  justify-content: flex-end;
+}
+
+/* 設置バッジの有無で行数が変わり、片方のカードだけ下にずれるのを防ぐ */
+.stage__meta {
+  min-height: 3.2rem;
+  align-content: flex-start;
 }
 
 .stage__label {
@@ -513,10 +601,12 @@ button.unit-card:disabled {
 }
 
 .stage__divider {
+  grid-area: divider;
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 0.75rem;
-  margin: 0.75rem 0 0.25rem;
+  margin: 0.25rem 0 0;
 }
 
 .stage__divider::before,
@@ -547,7 +637,7 @@ button.unit-card:disabled {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  animation: caption-in 0.2s ease-out;
+  animation: caption-in calc(var(--fx) * 200ms) ease-out;
 }
 
 @keyframes caption-in {
@@ -574,34 +664,49 @@ button.unit-card:disabled {
 .stage-unit__main {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
+  gap: 0.6rem;
 }
 
+/* 右の陣営はアイコンを外側に置き、中央で向かい合わせる */
+.stage-unit--right .stage-unit__main {
+  flex-direction: row-reverse;
+}
+
+/* 鏡写しにするのはアイコンとHPの並びだけ。技リストの本文は左寄せのまま読ませる */
+.stage-unit--right .stage-unit__name-row {
+  text-align: right;
+}
+
+.stage-unit--right .badges {
+  justify-content: flex-end;
+}
+
+/* 盤面の視線の中心。一律拡大に上乗せして大きくし、属性色の発光を強めて際立たせる */
 .stage-unit__icon {
   position: relative;
   flex: 0 0 auto;
   display: grid;
   place-items: center;
-  width: 3.5rem;
-  height: 3.5rem;
+  width: 4rem;
+  height: 4rem;
   border-radius: 50%;
   background: var(--surface-2);
-  border: 2px solid var(--border);
+  border: 3px solid var(--border);
 }
 
 .stage-unit__emoji {
-  font-size: 1.9rem;
+  font-size: 2.2rem;
   line-height: 1;
 }
 
 .stage-unit__emoji--gu {
-  filter: drop-shadow(0 0 6px rgba(232, 132, 92, 0.5));
+  filter: drop-shadow(0 0 10px rgba(232, 132, 92, 0.75));
 }
 .stage-unit__emoji--choki {
-  filter: drop-shadow(0 0 6px rgba(127, 200, 169, 0.5));
+  filter: drop-shadow(0 0 10px rgba(127, 200, 169, 0.75));
 }
 .stage-unit__emoji--pa {
-  filter: drop-shadow(0 0 6px rgba(154, 140, 240, 0.5));
+  filter: drop-shadow(0 0 10px rgba(154, 140, 240, 0.75));
 }
 
 .stage-unit__info {
@@ -636,6 +741,62 @@ button.unit-card:disabled {
   gap: 0.3rem;
 }
 
+/* いま打ったら何ダメージか。表記どおりの威力が入ることはまずない */
+.slot__damage {
+  flex: 0 0 auto;
+  padding: 0.05rem 0.4rem;
+  border-radius: 0.3rem;
+  font-size: 0.85rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  background: var(--surface-2);
+}
+
+.slot__damage--advantage {
+  color: #ffb27a;
+  background: rgba(232, 132, 92, 0.18);
+}
+.slot__damage--disadvantage {
+  color: var(--muted);
+}
+.slot__damage--fixed {
+  color: #8cc4f0;
+}
+
+.slot__uncertain {
+  font-style: normal;
+  opacity: 0.7;
+}
+
+.slot__breakdown {
+  font-size: 0.68rem;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.btn__damage {
+  margin-left: 0.4rem;
+  font-style: normal;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.btn__damage--advantage {
+  color: #ffb27a;
+}
+.btn__damage--disadvantage {
+  color: var(--muted);
+}
+.btn__damage--fixed {
+  color: #8cc4f0;
+}
+
+.btn__breakdown {
+  font-size: 0.68rem;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
 /* --- 控えの丸 ------------------------------------------------------------ */
 
 .bench-dots {
@@ -667,7 +828,7 @@ button.unit-card:disabled {
 }
 
 .bench-dot__icon {
-  font-size: 0.9rem;
+  font-size: 1.05rem;
   line-height: 1;
 }
 
@@ -703,7 +864,7 @@ button.unit-card:disabled {
   white-space: nowrap;
   pointer-events: none;
   transform: translateX(-50%);
-  animation: float-up 0.9s ease-out forwards;
+  animation: float-up calc(var(--fx) * 590ms) ease-out forwards;
 }
 
 .floating__note {
@@ -735,25 +896,59 @@ button.unit-card:disabled {
   font-size: 0.85rem;
 }
 
+/* 相性補正 (SPEC §2)。同じ技でも25 動く理由を数値の脇に出す */
+.floating__matchup {
+  font-size: 0.62rem;
+  font-weight: 700;
+  font-style: normal;
+  letter-spacing: 0.02em;
+}
+
+.floating.is-advantage {
+  font-size: 1.35rem;
+  color: #ffb27a;
+  background: rgba(232, 132, 92, 0.22);
+  box-shadow: 0 0 0.6rem rgba(232, 132, 92, 0.35);
+}
+
+.floating.is-disadvantage {
+  font-size: 0.95rem;
+  color: #b6b6c0;
+  background: rgba(120, 120, 135, 0.2);
+}
+
+/*
+ * 読ませたいのは数値なので、**上がりきったところで留める**。
+ * 以前は上がりながら薄れていくだけで、はっきり見える時間がほとんどなかった。
+ */
 @keyframes float-up {
   0% {
     opacity: 0;
-    transform: translate(-50%, 0.5rem);
+    transform: translate(-50%, 0.6rem);
   }
-  25% {
+  18% {
     opacity: 1;
-    transform: translate(-50%, -0.2rem);
+    transform: translate(-50%, -0.3rem);
+  }
+  70% {
+    opacity: 1;
+    transform: translate(-50%, -0.6rem);
   }
   100% {
     opacity: 0;
-    transform: translate(-50%, -1.6rem);
+    transform: translate(-50%, -1.8rem);
   }
 }
 
 /* 被弾で揺れて赤く光る */
 .stage-unit__icon.is-damage {
-  animation: shake 0.42s ease-in-out;
+  animation: shake calc(var(--fx) * 420ms) ease-in-out;
   border-color: var(--danger);
+}
+
+/* 有利対面は揺れも強くする */
+.stage-unit__icon.is-damage.is-advantage {
+  animation-name: shake-hard;
 }
 
 @keyframes shake {
@@ -765,8 +960,17 @@ button.unit-card:disabled {
   80% { transform: translateX(-0.1rem); }
 }
 
+@keyframes shake-hard {
+  0%, 100% { transform: translateX(0) scale(1); }
+  15% { transform: translateX(-0.75rem) scale(1.08); }
+  30% { transform: translateX(0.65rem) scale(1.06); }
+  45% { transform: translateX(-0.45rem) scale(1.04); }
+  60% { transform: translateX(0.35rem); }
+  80% { transform: translateX(-0.2rem); }
+}
+
 .stage-unit__icon.is-heal {
-  animation: pulse 0.6s ease-out;
+  animation: pulse calc(var(--fx) * 540ms) ease-out;
   border-color: var(--ok);
 }
 
@@ -776,7 +980,7 @@ button.unit-card:disabled {
 }
 
 .stage-unit__icon.is-faint {
-  animation: collapse 0.8s ease-in forwards;
+  animation: collapse calc(var(--fx) * 850ms) ease-in forwards;
 }
 
 @keyframes collapse {
@@ -787,24 +991,25 @@ button.unit-card:disabled {
 }
 
 .stage-unit__icon.is-switch {
-  animation: slide-in 0.5s ease-out;
+  animation: slide-in calc(var(--fx) * 620ms) ease-out;
   border-color: var(--accent);
 }
 
-.stage-unit--top .stage-unit__icon.is-switch {
-  animation-name: slide-in-top;
+/* 左の陣営は左から、右の陣営は右からせり出す */
+.stage-unit--right .stage-unit__icon.is-switch {
+  animation-name: slide-in-right;
 }
 
 @keyframes slide-in {
-  from { transform: translateY(2rem); opacity: 0; }
+  from { transform: translateX(-2rem); opacity: 0; }
 }
 
-@keyframes slide-in-top {
-  from { transform: translateY(-2rem); opacity: 0; }
+@keyframes slide-in-right {
+  from { transform: translateX(2rem); opacity: 0; }
 }
 
 .stage-unit__icon.is-poison {
-  animation: pulse-poison 0.6s ease-out;
+  animation: pulse-poison calc(var(--fx) * 480ms) ease-out;
   border-color: #9a5cb0;
 }
 
@@ -814,7 +1019,7 @@ button.unit-card:disabled {
 }
 
 .stage-unit__icon.is-modifier {
-  animation: pulse-mod 0.6s ease-out;
+  animation: pulse-mod calc(var(--fx) * 480ms) ease-out;
   border-color: var(--warn);
 }
 
@@ -976,20 +1181,212 @@ button.unit-card:disabled {
   font-size: 0.9rem;
 }
 
+/*
+ * 狭い画面。**2列は崩さない** (配置が動かないことが要件) ので、
+ * 縦積みにする代わりに字と余白を詰める。
+ */
+@media (max-width: 40rem) {
+  .stage-unit {
+    padding: 0.5rem;
+  }
+
+  .stage-unit__main {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.35rem;
+  }
+
+  .stage-unit--right .stage-unit__main {
+    flex-direction: column;
+    align-items: flex-end;
+  }
+
+  .stage-unit__info {
+    width: 100%;
+  }
+
+  .stage-unit__name-row {
+    flex-direction: column;
+    align-items: inherit;
+    gap: 0;
+  }
+
+  .stage-unit__name {
+    font-size: 0.95rem;
+  }
+
+  .stage-unit__icon {
+    width: 3.2rem;
+    height: 3.2rem;
+  }
+
+  .stage-unit__emoji {
+    font-size: 1.8rem;
+  }
+
+  .slot__text,
+  .slot__breakdown {
+    font-size: 0.62rem;
+  }
+
+  .bench-dot__name {
+    display: none;
+  }
+
+  .select-stage {
+    gap: 0.4rem;
+  }
+
+  .select-column {
+    padding: 0.4rem;
+  }
+}
+
+/* --- 控えの詳細オーバーレイ ---------------------------------------------- */
+
+.bench-dot__button {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  margin: -0.15rem -0.5rem;
+  padding: 0.15rem 0.5rem;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  cursor: pointer;
+  font-size: inherit;
+}
+
+.bench-dot__button:hover {
+  background: var(--surface-2);
+}
+
+.detail {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+}
+
+.detail__backdrop {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  padding: 0;
+  background: rgba(10, 10, 14, 0.75);
+  cursor: pointer;
+}
+
+.detail__panel {
+  position: relative;
+  width: min(24rem, 100%);
+  max-height: 100%;
+  overflow-y: auto;
+  display: grid;
+  gap: 0.6rem;
+  animation: caption-in calc(var(--fx) * 150ms) ease-out;
+}
+
+.detail__close {
+  justify-self: center;
+}
+
+/* --- 操作欄に出す確認 (対人戦) ------------------------------------------- */
+
+/* 盤面を隠さないゲート。再生前と入力前で共用する */
+.panel-gate {
+  display: grid;
+  justify-items: center;
+  gap: 0.3rem;
+  padding: 1.1rem 1rem;
+  border: 1px solid var(--accent);
+  border-radius: 0.75rem;
+  background: var(--surface);
+  text-align: center;
+}
+
+.panel-gate__title {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+
+.panel-gate__hint {
+  margin: 0 0 0.4rem;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+/* --- 選出の左右割り ------------------------------------------------------ */
+
+.select-stage {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
+}
+
+.select-column {
+  min-width: 0;
+  padding: 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+  background: rgba(255, 255, 255, 0.015);
+}
+
+/* 選ぶ側の列を立たせる。読むだけの列と取り違えないため */
+.select-column.is-active {
+  border-color: var(--accent);
+  background: var(--surface);
+}
+
+.select-column h3 {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0 0 0.5rem;
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+
+.select-column__you {
+  padding: 0.05rem 0.4rem;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #12121a;
+  font-size: 0.68rem;
+  font-style: normal;
+  font-weight: 700;
+}
+
+.select-column__note {
+  margin: 0.5rem 0 0;
+  font-size: 0.7rem;
+  color: var(--muted);
+}
+
+/* 列の中は1体ずつ縦に積む。2列に割っているので横並びにはしない */
+.unit-grid--column {
+  grid-template-columns: 1fr;
+  gap: 0.5rem;
+}
+
 /* --- 画面幅が広いとき ---------------------------------------------------- */
 
-@media (min-width: 48rem) {
+@media (min-width: 56rem) {
   .app {
     padding: 2rem 1.5rem 4rem;
   }
 
   .stage-unit__icon {
-    width: 4.25rem;
-    height: 4.25rem;
+    width: 5rem;
+    height: 5rem;
   }
 
   .stage-unit__emoji {
-    font-size: 2.3rem;
+    font-size: 2.8rem;
   }
 
   .screen--battle {
