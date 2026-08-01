@@ -47,7 +47,7 @@ describe('draftParty — AIの編成 (SPEC §1)', () => {
 describe('draftTeam — AIの選出 (SPEC §1)', () => {
   it('TEAM_SIZE 体を選ぶ', () => {
     const own: UnitId[] = ['ishi', 'kenro', 'kami', 'bara', 'issen'];
-    expect(draftTeam(own, ['hasami', 'issen', 'bara', 'yamaarashi', 'hasamimushi'])).toHaveLength(
+    expect(draftTeam(own, ['hasami', 'issen', 'bara', 'yamaarashi', 'kamakiri'])).toHaveLength(
       TEAM_SIZE,
     );
   });
@@ -62,7 +62,7 @@ describe('draftTeam — AIの選出 (SPEC §1)', () => {
   it('相手がチョキ揃いなら、有利なグーを優先する', () => {
     // 自分: グー2体 + パー3体 / 相手: チョキ5体。グー > チョキ なのでグーが選ばれる
     const own: UnitId[] = ['ishi', 'kenro', 'kami', 'utsuwa', 'uchiwa'];
-    const opponent: UnitId[] = ['hasami', 'issen', 'bara', 'yamaarashi', 'hasamimushi'];
+    const opponent: UnitId[] = ['hasami', 'issen', 'bara', 'yamaarashi', 'kamakiri'];
 
     const team = draftTeam(own, opponent);
     expect(team).toContain('ishi');

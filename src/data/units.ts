@@ -18,7 +18,7 @@ import { utsuwaDevotion } from '../engine/effects/utsuwa';
 import { TENOHIRA_HEAL_USES } from '../engine/constants';
 import { funsaiFortitude } from '../engine/effects/funsai';
 import { ghostCurse } from '../engine/effects/ghost';
-import { hasamimushiGrowth, hasamimushiHealBlock } from '../engine/effects/hasamimushi';
+import { kamakiriGrowth, kamakiriHealBlock } from '../engine/effects/kamakiri';
 import { magyuDecay, magyuEscape } from '../engine/effects/magyu';
 import { tekkenPursuit } from '../engine/effects/tekken';
 import { uchiwaGust } from '../engine/effects/uchiwa';
@@ -38,10 +38,10 @@ export const UNITS = {
         kind: 'move',
         move: {
           name: '粉砕撃',
-          text: '威力60。自分に固定35の反動。',
+          text: '威力60。自分に固定30の反動。',
           damage: { kind: 'normal', power: 60 },
           priority: 'normal',
-          recoil: 35,
+          recoil: 30,
         },
       },
       {
@@ -173,9 +173,9 @@ export const UNITS = {
 
   // --- チョキ ---------------------------------------------------------------
 
-  hasamimushi: {
-    id: 'hasamimushi',
-    name: 'ハサミムシ',
+  kamakiri: {
+    id: 'kamakiri',
+    name: 'カマキリ',
     attribute: 'choki',
     maxHp: 120,
     speed: 'fast',
@@ -187,7 +187,7 @@ export const UNITS = {
           text: '威力15。使うたびに威力+5(上限なし)。交代でリセット。',
           damage: { kind: 'normal', power: 15 },
           priority: 'normal',
-          hooks: hasamimushiGrowth,
+          hooks: kamakiriGrowth,
         },
       },
       {
@@ -195,7 +195,7 @@ export const UNITS = {
         ability: {
           name: '治癒封じ',
           text: '場にいる間、相手側で発生するあらゆる回復を無効化する。',
-          hooks: hasamimushiHealBlock,
+          hooks: kamakiriHealBlock,
         },
       },
     ],
@@ -369,7 +369,7 @@ export const UNITS = {
         kind: 'ability',
         ability: {
           name: '呪詛返し',
-          text: '瀕死になったとき、相手に固定35を返す(死因を問わない)。',
+          text: '瀕死になったとき、相手に固定40を返す(死因を問わない)。',
           hooks: ghostCurse,
         },
       },
@@ -477,7 +477,7 @@ export function getUnit(id: UnitId): UnitDef {
 
 /**
  * 枠から技を取り出す。特性枠を指した場合は例外を投げる。
- * 特性枠のユニット(粉砕・堅牢・ハサミムシ・山嵐・ゴースト)は選択できる技が1つだけなので、
+ * 特性枠のユニット(粉砕・堅牢・カマキリ・山嵐・ゴースト)は選択できる技が1つだけなので、
  * 行動の生成側が枠を選ぶ時点で `isMoveSlot` で絞り込むこと。
  */
 export function getMove(unit: UnitDef, index: SlotIndex): MoveDef {

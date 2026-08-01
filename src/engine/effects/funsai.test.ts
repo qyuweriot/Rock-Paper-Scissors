@@ -2,9 +2,13 @@ import { describe, expect, it } from 'vitest';
 import { resolveReplacements, resolveTurn } from '../battle';
 import { funsaiFortitude } from './funsai';
 import { active, eventsOfType, inert, INERT, makeBattle, move, setHp } from '../testkit';
+import { getMove, UNITS } from '../../data/units';
+
+/** 反動量はデータ側の値を採る。調整したときにこのファイルが追随する */
+const RECOIL = getMove(UNITS.funsai, 0).recoil ?? 0;
 
 /**
- * 粉砕 gu HP60 遅 / 技0 威力60 + 自分に固定35の反動 / 特性「不撓」(SPEC §10.1)
+ * 粉砕 gu HP60 遅 / 技0 威力60 + 自分に固定30の反動 / 特性「不撓」(SPEC §10.1)
  *
  * PLAN §218-225 が必須と定める処理順のケースをここで固定する。
  * 撃破判定を反動の前後どちらに置くかで「常に自滅」か「常に無傷」に倒れるため、
@@ -26,7 +30,7 @@ describe('粉砕 — 不撓 (SPEC §10.1)', () => {
     expect(eventsOfType(events, 'damage').filter((d) => d.source === 'recoil')).toHaveLength(0);
   });
 
-  it('撃破失敗 → 反動35を受けるが、1回なら耐える', () => {
+  it('撃破失敗 → 反動を受けるが、1回なら耐える', () => {
     // 器 pa HP130 は不利対面 (60−10=50) なので落とせない。
     // 控えがいないので器の技2は空振りし、粉砕は反動以外のダメージを受けない
     const state = makeBattle(['funsai'], [INERT]);
@@ -35,16 +39,16 @@ describe('粉砕 — 不撓 (SPEC §10.1)', () => {
 
     const recoils = eventsOfType(events, 'damage').filter((d) => d.source === 'recoil');
     expect(recoils).toHaveLength(1);
-    expect(recoils[0]?.amount).toBe(35);
+    expect(recoils[0]?.amount).toBe(RECOIL);
     expect(active(after, 'p1').fainted).toBe(false);
-    expect(active(after, 'p1').hp).toBe(25); // 60 − 35
+    expect(active(after, 'p1').hp).toBe(UNITS.funsai.maxHp - RECOIL);
   });
 
   it('撃破失敗が2回続く → 反動で自滅する', () => {
     let state = makeBattle(['funsai'], [INERT]);
 
     state = resolveTurn(state, { p1: move(0), p2: inert() }).state;
-    expect(active(state, 'p1').hp).toBe(25);
+    expect(active(state, 'p1').hp).toBe(UNITS.funsai.maxHp - RECOIL);
 
     const { state: after } = resolveTurn(state, { p1: move(0), p2: inert() });
 
@@ -61,20 +65,20 @@ describe('粉砕 — 不撓 (SPEC §10.1)', () => {
 
     expect(active(after, 'p2').fainted).toBe(true);
     expect(active(after, 'p1').fainted).toBe(false);
-    // 堅牢の重打15 は受けている。反動35 は受けていない
+    // 堅牢の重打15 は受けている。反動は受けていない
     expect(active(after, 'p1').hp).toBe(45);
     expect(eventsOfType(events, 'damage').filter((d) => d.source === 'recoil')).toHaveLength(0);
   });
 
-  it('相手がハサミムシでも反動無効は効く。回復ではないため治癒封じで止まらない (SPEC §10.6)', () => {
-    const state = makeBattle(['funsai'], ['hasamimushi']);
+  it('相手がカマキリでも反動無効は効く。回復ではないため治癒封じで止まらない (SPEC §10.6)', () => {
+    const state = makeBattle(['funsai'], ['kamakiri']);
     setHp(state, 'p2', 0, 85); // 有利対面の85 でちょうど落ちる
 
     const { state: after, events } = resolveTurn(state, { p1: move(0), p2: move(0) });
 
     expect(after.sides.p2.party[0]?.fainted).toBe(true);
     expect(after.sides.p1.party[0]?.fainted).toBe(false);
-    // ハサミムシの連撃5(不利補正)だけを受けている
+    // カマキリの連撃5(不利補正)だけを受けている
     expect(active(after, 'p1').hp).toBe(55);
     // 回復の仕組みを通っていないので、封じられる余地がない
     expect(eventsOfType(events, 'healBlocked')).toHaveLength(0);

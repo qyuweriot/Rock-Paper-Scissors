@@ -127,8 +127,8 @@ export interface Report {
   attributes: AttributeStat[];
   selections: SelectionStat[];
   issen: IssenStat;
-  /** ハサミムシと粉砕が敵味方に分かれた試合での粉砕側の勝率 (SPEC §12-2) */
-  hasamimushiVsFunsai: { games: number; funsaiWinRate: number };
+  /** カマキリと粉砕が敵味方に分かれた試合での粉砕側の勝率 (SPEC §12-2) */
+  kamakiriVsFunsai: { games: number; funsaiWinRate: number };
 }
 
 export function buildReport(results: GameResult[]): Report {
@@ -180,9 +180,9 @@ export function buildReport(results: GameResult[]): Report {
         record(result.issenStacked[side] ? issenStacked : issenNotStacked, result, side);
       }
 
-      // ハサミムシ × 粉砕 (SPEC §12-2)。粉砕側から見た勝率を採る
+      // カマキリ × 粉砕 (SPEC §12-2)。粉砕側から見た勝率を採る
       const opponentTeam = result.teams[side === 'p1' ? 'p2' : 'p1'];
-      if (team.includes('funsai') && opponentTeam.includes('hasamimushi')) {
+      if (team.includes('funsai') && opponentTeam.includes('kamakiri')) {
         record(funsaiVs, result, side);
       }
     }
@@ -241,7 +241,7 @@ export function buildReport(results: GameResult[]): Report {
       notStacked: { games: issenNotStacked.games, winRate: winRate(issenNotStacked) },
     },
 
-    hasamimushiVsFunsai: { games: funsaiVs.games, funsaiWinRate: winRate(funsaiVs) },
+    kamakiriVsFunsai: { games: funsaiVs.games, funsaiWinRate: winRate(funsaiVs) },
   };
 }
 

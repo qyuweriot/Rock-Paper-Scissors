@@ -165,13 +165,13 @@ describe('実データとの突き合わせ', () => {
     expect(neutral).toBeGreaterThanOrEqual(UNITS.funsai.maxHp);
   });
 
-  it('粉砕は反動35。撃破に失敗しても即死はせず、2回目で自滅する (SPEC §10.1)', () => {
+  it('粉砕は反動30。撃破に失敗しても即死はせず、2回目で自滅する (SPEC §10.1)', () => {
     const smash = getMove(UNITS.funsai, 0);
     const recoil = smash.recoil ?? 0;
 
-    expect(recoil).toBe(35);
+    expect(recoil).toBe(30);
     expect(UNITS.funsai.maxHp).toBe(60);
-    // 満タンから1回は耐える (60 → 25)、2回目で落ちる
+    // 満タンから1回は耐える (60 → 30)、2回目で落ちる
     expect(UNITS.funsai.maxHp - recoil).toBeGreaterThan(0);
     expect(UNITS.funsai.maxHp - recoil * 2).toBeLessThanOrEqual(0);
   });

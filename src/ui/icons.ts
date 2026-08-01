@@ -18,7 +18,7 @@ export const UNIT_ICONS: Record<UnitId, string> = {
   ishi: '🪨',
 
   // チョキ
-  hasamimushi: '🦗',
+  kamakiri: '🦗',
   yamaarashi: '🦔',
   bara: '🌹',
   issen: '⚡',

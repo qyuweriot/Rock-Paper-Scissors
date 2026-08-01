@@ -66,15 +66,15 @@ Phase 6(UI)完了時点の内容。
 |---|---:|---|
 | `KENRO_TURN_HEAL` | 5 | 堅牢のターン終了時回復 |
 | `YAMAARASHI_REFLECT` | 10 | 山嵐の反射 |
-| `GHOST_FAINT_REFLECT` | 30 | ゴーストの瀕死時反射 |
-| `TENOHIRA_HEAL` | 30 | 手のひらの自己回復 |
+| `GHOST_FAINT_REFLECT` | 40 | ゴーストの瀕死時反射 |
+| `TENOHIRA_HEAL` | 25 | 手のひらの自己回復 |
 | `TENOHIRA_HEAL_USES` | 3 | 手のひらの回復の使用回数上限(1試合) |
 | `UTSUWA_HEAL` | 15 | 器の控え回復 |
-| `ISSEN_ATK_UP` | 10 | 一閃の積み1回分 |
+| `ISSEN_ATK_UP` | 15 | 一閃の積み1回分 |
 | `HASAMI_DEF_UP` | 10 | はさみの守勢上昇 |
 | `TEKKEN_PURSUIT_BONUS` | 20 | 鉄拳の追い討ち |
 | `MAGYU_POWER_DECAY` | 10 | 魔球の使用ごとの減衰 |
-| `HASAMIMUSHI_POWER_GROWTH` | 5 | ハサミムシの使用ごとの増強 |
+| `KAMAKIRI_POWER_GROWTH` | 5 | カマキリの使用ごとの増強 |
 
 ---
 
@@ -87,9 +87,9 @@ Phase 6(UI)完了時点の内容。
 | `maxHp` | 堅牢 140 | `HP_MIN`〜`HP_MAX` の範囲内に収めること |
 | `speed` | `'fast'` / `'mid'` / `'slow'` | |
 | `attribute` | `'gu'` / `'choki'` / `'pa'` | 変えると属性ごと5体の均等が崩れ、テストが落ちる |
-| `damage.power` | 粉砕 50 | 通常ダメージ。相性補正と修正値が乗る |
+| `damage.power` | 粉砕 60 | 通常ダメージ。相性補正と修正値が乗る |
 | `damage.amount` | 手のひら 20 | 固定ダメージ。全修正を無視する |
-| `recoil` | 粉砕50 / 石15 / ゴースト5 | 自分が受ける固定の反動 |
+| `recoil` | 粉砕30 / 石15 / ゴースト5 | 自分が受ける固定の反動 |
 | `priority` | `'first'` / `'normal'` | 先制の付け外し |
 | `maxUses` | 手のひら技2 = 3 | 1試合の使用回数上限。使い切ると選べなくなる。**全技に付けると行動不能になる** |
 | `name` / `text` | 技名・効果テキスト | **表示のみ。挙動に影響しない**ので自由に変えてよい |
@@ -196,7 +196,7 @@ npm run sim -- --ai1 3 --ai2 2   # AI の強さ比較
 | 1 | 粉砕の勝率 | `units.ts` の威力・反動・HP | 今すぐ可能 |
 | 3 | ターン上限 | `constants.ts` の `TURN_LIMIT` | 今すぐ可能 |
 | 5 | 一閃の累積上限 | `constants.ts` の `PERSISTENT_MODIFIER_CAP` | 今すぐ可能 |
-| 2 | ハサミムシ × 粉砕 | `hasamimushi.ts` の `onModifyHeal` | 今すぐ可能 |
+| 2 | カマキリ × 粉砕 | `kamakiri.ts` の `onModifyHeal` | 今すぐ可能 |
 | 4 | 毒・設置の解除手段 | 新しい技・ユニットの追加 | 効果の仕組みは完成済み |
 
 ---

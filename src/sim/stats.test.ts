@@ -133,21 +133,21 @@ describe('buildReport — 集計', () => {
     });
   });
 
-  describe('ハサミムシ × 粉砕 (SPEC §12-2)', () => {
+  describe('カマキリ × 粉砕 (SPEC §12-2)', () => {
     it('両者が敵味方に分かれた試合を、粉砕側から見て数える', () => {
       const funsaiTeam: UnitId[] = ['funsai', 'ishi', 'kenro'];
-      const mushiTeam: UnitId[] = ['hasamimushi', 'bara', 'hasami'];
+      const mushiTeam: UnitId[] = ['kamakiri', 'bara', 'hasami'];
       const report = buildReport([
         game(funsaiTeam, mushiTeam, 'p1'),
         game(funsaiTeam, mushiTeam, 'p2'),
         game(funsaiTeam, mushiTeam, 'p2'),
       ]);
-      expect(report.hasamimushiVsFunsai).toEqual({ games: 3, funsaiWinRate: 1 / 3 });
+      expect(report.kamakiriVsFunsai).toEqual({ games: 3, funsaiWinRate: 1 / 3 });
     });
 
     it('同じ陣営に両者がいる試合は数えない', () => {
-      const report = buildReport([game(['funsai', 'hasamimushi', 'ishi'], A, 'p1')]);
-      expect(report.hasamimushiVsFunsai.games).toBe(0);
+      const report = buildReport([game(['funsai', 'kamakiri', 'ishi'], A, 'p1')]);
+      expect(report.kamakiriVsFunsai.games).toBe(0);
     });
   });
 });
@@ -155,13 +155,13 @@ describe('buildReport — 集計', () => {
 describe('buildMatchupTable — 1対1の対面表', () => {
   it('p1側を行、p2側を列として並べる', () => {
     const cells = buildMatchupTable([
-      game(['funsai'], ['hasamimushi'], 'p2', 4),
-      game(['hasamimushi'], ['funsai'], 'p1', 5),
+      game(['funsai'], ['kamakiri'], 'p2', 4),
+      game(['kamakiri'], ['funsai'], 'p1', 5),
     ]);
 
     expect(cells).toEqual([
-      { attacker: 'funsai', defender: 'hasamimushi', result: 'p2', turns: 4 },
-      { attacker: 'hasamimushi', defender: 'funsai', result: 'p1', turns: 5 },
+      { attacker: 'funsai', defender: 'kamakiri', result: 'p2', turns: 4 },
+      { attacker: 'kamakiri', defender: 'funsai', result: 'p1', turns: 5 },
     ]);
   });
 });

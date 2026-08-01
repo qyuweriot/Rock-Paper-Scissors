@@ -16,7 +16,7 @@ const SPEC_TABLE: [id: string, name: string, attribute: Attribute, hp: number, s
   ['kenro', '堅牢', 'gu', 140, 'slow'],
   ['ishi', '石', 'gu', 100, 'mid'],
   // チョキ
-  ['hasamimushi', 'ハサミムシ', 'choki', 120, 'fast'],
+  ['kamakiri', 'カマキリ', 'choki', 120, 'fast'],
   ['yamaarashi', '山嵐', 'choki', 90, 'mid'],
   ['bara', 'バラ', 'choki', 80, 'mid'],
   ['issen', '一閃', 'choki', 40, 'fast'],
@@ -125,7 +125,7 @@ describe('個別仕様の反映 (SPEC §10)', () => {
     expect(firstMoves.sort()).toEqual(['kami:1', 'tekken:0']);
   });
 
-  it('反動を持つのは粉砕35 / 石15 / ゴースト5 だけ (SPEC §4.2)', () => {
+  it('反動を持つのは粉砕30 / 石15 / ゴースト5 だけ (SPEC §4.2)', () => {
     const recoils: [string, number][] = [];
     for (const unit of UNIT_LIST) {
       for (const slot of unit.slots) {
@@ -135,7 +135,7 @@ describe('個別仕様の反映 (SPEC §10)', () => {
       }
     }
     expect(recoils.sort()).toEqual([
-      ['funsai', 35],
+      ['funsai', 30],
       ['ghost', 5],
       ['ishi', 15],
     ]);
@@ -159,7 +159,7 @@ describe('個別仕様の反映 (SPEC §10)', () => {
     expect(withAbility.map((u) => u.id).sort()).toEqual([
       'funsai',
       'ghost',
-      'hasamimushi',
+      'kamakiri',
       'kenro',
       'yamaarashi',
     ]);

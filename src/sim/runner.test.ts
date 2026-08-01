@@ -109,7 +109,7 @@ describe('runGame — 1試合の実行', () => {
    */
   describe('盤面を見るAIはランダムを圧倒する (PLAN §273)', () => {
     const teams: UnitId[][] = [
-      ['funsai', 'hasamimushi', 'tenohira'],
+      ['funsai', 'kamakiri', 'tenohira'],
       ['ishi', 'kenro', 'kami'],
       ['bara', 'issen', 'hasami'],
       ['magyu', 'uchiwa', 'ghost'],

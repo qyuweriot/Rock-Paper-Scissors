@@ -69,7 +69,7 @@ export const KENRO_TURN_HEAL = 5;
 /** 山嵐: 攻撃技を受けたときに返す固定ダメージ (§10.7) */
 export const YAMAARASHI_REFLECT = 10;
 /** ゴースト: 瀕死時に返す固定ダメージ (§10.12) */
-export const GHOST_FAINT_REFLECT = 35;
+export const GHOST_FAINT_REFLECT = 40;
 /** 手のひら: 技2の自己回復量 (§10.11) */
 export const TENOHIRA_HEAL = 25;
 /** 手のひら: 技2の1試合あたりの使用回数上限。回復の応酬による膠着を防ぐ (§10.11) */
@@ -84,5 +84,5 @@ export const HASAMI_DEF_UP = 10;
 export const TEKKEN_PURSUIT_BONUS = 20;
 /** 魔球: 技1の使用ごとの威力減衰。下限0 (§10.3) */
 export const MAGYU_POWER_DECAY = 10;
-/** ハサミムシ: 技1の使用ごとの威力上昇。上限なし (§10.6) */
-export const HASAMIMUSHI_POWER_GROWTH = 5;
+/** カマキリ: 技1の使用ごとの威力上昇。上限なし (§10.6) */
+export const KAMAKIRI_POWER_GROWTH = 5;

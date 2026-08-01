@@ -1,14 +1,14 @@
-/** ハサミムシ (SPEC §10.6) */
+/** カマキリ (SPEC §10.6) */
 
-import { HASAMIMUSHI_POWER_GROWTH } from '../constants';
+import { KAMAKIRI_POWER_GROWTH } from '../constants';
 import type { EffectHooks } from './context';
 
 /**
  * 技1「連撃」: 使うたびに威力+5。上限なし。
  * 交代でのリセットは battle.ts の resetVolatile が担う (SPEC §7.3)。
  */
-export const hasamimushiGrowth: EffectHooks = {
-  onModifyPower: ({ power, useCount }) => power + HASAMIMUSHI_POWER_GROWTH * useCount,
+export const kamakiriGrowth: EffectHooks = {
+  onModifyPower: ({ power, useCount }) => power + KAMAKIRI_POWER_GROWTH * useCount,
 };
 
 /**
@@ -22,6 +22,6 @@ export const hasamimushiGrowth: EffectHooks = {
  * **粉砕の特性は対象外** (SPEC §10.1 / §10.6)。反動の無効化であって回復ではないため、
  * 回復の経路を通らず、ここで止める余地がない。
  */
-export const hasamimushiHealBlock: EffectHooks = {
+export const kamakiriHealBlock: EffectHooks = {
   onModifyHeal: () => 0,
 };

@@ -28,7 +28,7 @@ describe('魔球 — 消耗弾 (SPEC §10.3)', () => {
   it('威力0でも使用でき、ダメージは相性補正のみになる', () => {
     // 互角の堅牢に3回撃って威力を0まで落としてから、相手をチョキに交代させる。
     // グー→チョキ は有利 (+25) なので、威力0 でも25 入る
-    let state = makeBattle(['magyu'], ['kenro', 'hasamimushi']);
+    let state = makeBattle(['magyu'], ['kenro', 'kamakiri']);
     for (let i = 0; i < 3; i++) {
       state = resolveTurn(state, { p1: move(0), p2: move(0) }).state;
     }

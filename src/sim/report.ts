@@ -103,20 +103,20 @@ function mdTable(header: string[], rows: (string | number)[][]): string {
   return lines.join('\n');
 }
 
-function funsaiVsHasamimushiCell(cells: MatchupCell[]): string {
-  const forward = cells.find((c) => c.attacker === 'funsai' && c.defender === 'hasamimushi');
-  const reverse = cells.find((c) => c.attacker === 'hasamimushi' && c.defender === 'funsai');
+function funsaiVsKamakiriCell(cells: MatchupCell[]): string {
+  const forward = cells.find((c) => c.attacker === 'funsai' && c.defender === 'kamakiri');
+  const reverse = cells.find((c) => c.attacker === 'kamakiri' && c.defender === 'funsai');
   if (!forward || !reverse) return '(1v1 モードでのみ出力)';
 
   const describe = (cell: MatchupCell, funsaiSide: 'p1' | 'p2'): string => {
     if (cell.result === 'stall') return '未決着';
     if (cell.result === 'draw') return `引き分け (${String(cell.turns)}T)`;
-    return `${cell.result === funsaiSide ? '粉砕' : 'ハサミムシ'}の勝ち (${String(cell.turns)}T)`;
+    return `${cell.result === funsaiSide ? '粉砕' : 'カマキリ'}の勝ち (${String(cell.turns)}T)`;
   };
 
   return [
     `- 粉砕が先手: ${describe(forward, 'p1')}`,
-    `- ハサミムシが先手: ${describe(reverse, 'p2')}`,
+    `- カマキリが先手: ${describe(reverse, 'p2')}`,
   ].join('\n');
 }
 
@@ -242,7 +242,7 @@ ${mdTable(
   const funsai = report.units.find((u) => u.id === 'funsai');
   const bara = report.units.find((u) => u.id === 'bara');
   const issenUnit = report.units.find((u) => u.id === 'issen');
-  const hasamimushi = report.units.find((u) => u.id === 'hasamimushi');
+  const kamakiri = report.units.find((u) => u.id === 'kamakiri');
 
   const issenDiff =
     report.issen.stacked.games > 0 && report.issen.notStacked.games > 0
@@ -278,16 +278,16 @@ ${mdTable(
 バラを含む試合の平均決着ターン **${bara ? num(bara.avgTurns) : '-'}** (全体平均 ${num(report.avgTurns)})
 未決着 ${bara?.stalls ?? 0} 件 / 勝率 ${bara ? pct(bara.winRate) : '-'}%
 
-### 4. ハサミムシ × 粉砕 — 回復無効が三竦みを逆転させていないか (SPEC §12-2)
+### 4. カマキリ × 粉砕 — 回復無効が三竦みを逆転させていないか (SPEC §12-2)
 
-3v3 で両者が敵味方に分かれた ${String(report.hasamimushiVsFunsai.games)} 試合における
-**粉砕側の勝率: ${pct(report.hasamimushiVsFunsai.funsaiWinRate)}%**
+3v3 で両者が敵味方に分かれた ${String(report.kamakiriVsFunsai.games)} 試合における
+**粉砕側の勝率: ${pct(report.kamakiriVsFunsai.funsaiWinRate)}%**
 
-ハサミムシ単体の勝率 ${hasamimushi ? pct(hasamimushi.winRate) : '-'}%
+カマキリ単体の勝率 ${kamakiri ? pct(kamakiri.winRate) : '-'}%
 
 1対1の直接対決:
 
-${funsaiVsHasamimushiCell(matchupCells ?? [])}
+${funsaiVsKamakiriCell(matchupCells ?? [])}
 
 ### 5. 未決着 — ターン上限の要否 (SPEC §12-3)
 

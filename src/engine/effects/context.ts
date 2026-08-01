@@ -105,13 +105,13 @@ export interface RecoilContext extends HookContext {
  * 新ユニットの追加が、エンジン本体を触らずデータ追加だけで済む状態を保つこと (PLAN §84)。
  */
 export interface EffectHooks {
-  /** 威力を書き換える。魔球の減衰 / ハサミムシの増強 / 鉄拳の追い討ち */
+  /** 威力を書き換える。魔球の減衰 / カマキリの増強 / 鉄拳の追い討ち */
   onModifyPower?: (ctx: PowerContext) => number;
   /** 技の副作用。修正値・回復・毒・設置・交代 */
   onUse?: (ctx: UseContext) => void;
   /** 攻撃技のダメージを受けた。山嵐の反射 (SPEC §10.7) */
   onAfterDamageTaken?: (ctx: DamageTakenContext) => void;
-  /** 相手側の回復量を書き換える。ハサミムシの回復無効 (SPEC §10.6) */
+  /** 相手側の回復量を書き換える。カマキリの回復無効 (SPEC §10.6) */
   onModifyHeal?: (ctx: HealContext) => number;
   /** 自分が受ける反動を書き換える。粉砕の反動無効 (SPEC §10.1) */
   onModifyRecoil?: (ctx: RecoilContext) => number;

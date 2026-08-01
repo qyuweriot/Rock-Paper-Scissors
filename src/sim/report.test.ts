@@ -56,7 +56,7 @@ describe('unitsCsv', () => {
 
 describe('matchupsCsv', () => {
   it('15×15 のマトリクスを出す。ヘッダ行と行見出しを含む', () => {
-    const results = [game(['funsai'], ['hasamimushi'], 'p2'), game(['hasamimushi'], ['funsai'], 'p1')];
+    const results = [game(['funsai'], ['kamakiri'], 'p2'), game(['kamakiri'], ['funsai'], 'p1')];
     const cells = results.map((r) => ({
       attacker: r.teams.p1[0] as UnitId,
       defender: r.teams.p2[0] as UnitId,
@@ -67,7 +67,7 @@ describe('matchupsCsv', () => {
     const lines = matchupsCsv(cells).trim().split('\n');
     expect(lines).toHaveLength(16);
     expect(lines[0]?.startsWith('p1＼p2,粉砕')).toBe(true);
-    // 粉砕(行) × ハサミムシ(列) は p2 の勝ち = 粉砕から見て負け
+    // 粉砕(行) × カマキリ(列) は p2 の勝ち = 粉砕から見て負け
     expect(lines[1]).toContain('負10T');
   });
 });
@@ -75,7 +75,7 @@ describe('matchupsCsv', () => {
 describe('summaryMarkdown', () => {
   const report = buildReport([
     game(['ishi', 'kenro', 'kami'], ['bara', 'issen', 'hasami'], 'p1'),
-    game(['funsai', 'tekken', 'magyu'], ['hasamimushi', 'yamaarashi', 'ghost'], 'draw'),
+    game(['funsai', 'tekken', 'magyu'], ['kamakiri', 'yamaarashi', 'ghost'], 'draw'),
   ]);
 
   it('勝率の定義を必ず書く。書かないと数字が比較できない', () => {
@@ -117,7 +117,7 @@ describe('summaryMarkdown', () => {
 
   it('PLAN §250-255 の監視項目を含む', () => {
     const md = summaryMarkdown(report, CONDITIONS, null);
-    for (const heading of ['粉砕の勝率', '一閃', 'バラ', 'ハサミムシ × 粉砕', '未決着']) {
+    for (const heading of ['粉砕の勝率', '一閃', 'バラ', 'カマキリ × 粉砕', '未決着']) {
       expect(md).toContain(heading);
     }
   });
@@ -128,11 +128,11 @@ describe('summaryMarkdown', () => {
 
   it('1v1 の対面表があれば直接対決の結果を書く', () => {
     const md = summaryMarkdown(report, { ...CONDITIONS, mode: '1v1' }, [
-      { attacker: 'funsai', defender: 'hasamimushi', result: 'p2', turns: 4 },
-      { attacker: 'hasamimushi', defender: 'funsai', result: 'p1', turns: 5 },
+      { attacker: 'funsai', defender: 'kamakiri', result: 'p2', turns: 4 },
+      { attacker: 'kamakiri', defender: 'funsai', result: 'p1', turns: 5 },
     ]);
-    expect(md).toContain('ハサミムシの勝ち (4T)');
-    expect(md).toContain('ハサミムシの勝ち (5T)');
+    expect(md).toContain('カマキリの勝ち (4T)');
+    expect(md).toContain('カマキリの勝ち (5T)');
   });
 
   it('空のレポートでも壊れない', () => {

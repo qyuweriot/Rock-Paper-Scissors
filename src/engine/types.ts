@@ -114,7 +114,7 @@ export interface UnitState {
   modifiers: Modifiers;
   /** 持続 'turn' の修正値。はさみ技2。ターン解決の終わりに消える (SPEC §4.3) */
   turnModifiers: Modifiers;
-  /** 枠ごとの使用回数。魔球の減衰とハサミムシの増強に使う。交代でリセット (SPEC §7.3) */
+  /** 枠ごとの使用回数。魔球の減衰とカマキリの増強に使う。交代でリセット (SPEC §7.3) */
   moveUseCounts: [number, number];
   /**
    * 試合を通じた枠ごとの使用回数。MoveDef.maxUses の判定に使う。

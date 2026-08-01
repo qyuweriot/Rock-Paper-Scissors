@@ -9,7 +9,7 @@ import type { EffectHooks } from './context';
  * - **控えのユニットは場にいないが回復は成立する。** 特性ではなく技だから
  * - 控えが全員瀕死なら選択対象がないので何も起こらない(ターンは消費)
  * - 控えが全員HP満タンでも技は使用できる(applyHeal が何も起こさない)
- * - ハサミムシが相手の場にいれば無効化される
+ * - カマキリが相手の場にいれば無効化される
  */
 export const utsuwaDevotion: EffectHooks = {
   onUse: ({ api, self, selection }) => {

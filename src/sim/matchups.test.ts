@@ -55,7 +55,7 @@ describe('matchups — 総当たりの組み合わせ生成', () => {
   it('1対1の対面は 15×15 = 225 通り。向きを区別する', () => {
     const pairs = singlesPairs();
     expect(pairs).toHaveLength(225);
-    expect(pairs).toContainEqual(['funsai', 'hasamimushi']);
-    expect(pairs).toContainEqual(['hasamimushi', 'funsai']);
+    expect(pairs).toContainEqual(['funsai', 'kamakiri']);
+    expect(pairs).toContainEqual(['kamakiri', 'funsai']);
   });
 });

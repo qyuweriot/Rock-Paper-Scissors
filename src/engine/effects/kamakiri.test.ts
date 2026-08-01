@@ -4,15 +4,15 @@ import { active, eventsOfType, makeBattle, move, setHp, switchTo, unit } from '.
 import type { Action } from '../types';
 
 /**
- * ハサミムシ choki HP120 速 / 技0 威力15(使うたび+5) / 特性「治癒封じ」(SPEC §10.6)
+ * カマキリ choki HP120 速 / 技0 威力15(使うたび+5) / 特性「治癒封じ」(SPEC §10.6)
  */
 const dealtToP2 = (events: ReturnType<typeof resolveTurn>['events']) =>
   eventsOfType(events, 'damage').find((d) => d.target.side === 'p2' && d.source === 'move')?.amount;
 
-describe('ハサミムシ — 連撃 (SPEC §10.6)', () => {
+describe('カマキリ — 連撃 (SPEC §10.6)', () => {
   it('使うたびに威力が5ずつ上がる', () => {
     // 堅牢 gu HP140。チョキ→グー は不利 (−10) なので 5 / 10 / 15 と読める
-    let state = makeBattle(['hasamimushi'], ['kenro']);
+    let state = makeBattle(['kamakiri'], ['kenro']);
     const observed: (number | undefined)[] = [];
 
     for (let i = 0; i < 3; i++) {
@@ -25,7 +25,7 @@ describe('ハサミムシ — 連撃 (SPEC §10.6)', () => {
   });
 
   it('交代でリセットされる', () => {
-    let state = makeBattle(['hasamimushi', 'bara'], ['kenro']);
+    let state = makeBattle(['kamakiri', 'bara'], ['kenro']);
     state = resolveTurn(state, { p1: move(0), p2: move(0) }).state; // 1回使用。次は10 のはず
     state = resolveTurn(state, { p1: switchTo(1), p2: move(0) }).state;
     state = resolveTurn(state, { p1: switchTo(0), p2: move(0) }).state;
@@ -35,9 +35,9 @@ describe('ハサミムシ — 連撃 (SPEC §10.6)', () => {
   });
 });
 
-describe('ハサミムシ — 治癒封じ (SPEC §10.6)', () => {
+describe('カマキリ — 治癒封じ (SPEC §10.6)', () => {
   it('手のひらの自己回復を無効化する', () => {
-    const state = makeBattle(['hasamimushi'], ['tenohira']);
+    const state = makeBattle(['kamakiri'], ['tenohira']);
     setHp(state, 'p2', 0, 50);
 
     const { state: after, events } = resolveTurn(state, { p1: move(0), p2: move(1) });
@@ -49,7 +49,7 @@ describe('ハサミムシ — 治癒封じ (SPEC §10.6)', () => {
   });
 
   it('器の控え回復を無効化する', () => {
-    const state = makeBattle(['hasamimushi'], ['utsuwa', 'kenro']);
+    const state = makeBattle(['kamakiri'], ['utsuwa', 'kenro']);
     setHp(state, 'p2', 1, 100);
 
     const healBench: Action = {
@@ -64,7 +64,7 @@ describe('ハサミムシ — 治癒封じ (SPEC §10.6)', () => {
   });
 
   it('堅牢のターン終了時回復を無効化する', () => {
-    const state = makeBattle(['hasamimushi'], ['kenro']);
+    const state = makeBattle(['kamakiri'], ['kenro']);
     setHp(state, 'p2', 0, 100);
 
     const { state: after, events } = resolveTurn(state, { p1: move(0), p2: move(0) });
@@ -73,8 +73,8 @@ describe('ハサミムシ — 治癒封じ (SPEC §10.6)', () => {
     expect(active(after, 'p2').hp).toBe(95); // 5ダメージのみ。回復は入らない
   });
 
-  it('ハサミムシが場を離れると回復が復活する', () => {
-    const state = makeBattle(['hasamimushi', 'bara'], ['kenro']);
+  it('カマキリが場を離れると回復が復活する', () => {
+    const state = makeBattle(['kamakiri', 'bara'], ['kenro']);
     setHp(state, 'p2', 0, 100);
 
     const away = resolveTurn(state, { p1: switchTo(1), p2: move(0) });
@@ -83,8 +83,8 @@ describe('ハサミムシ — 治癒封じ (SPEC §10.6)', () => {
     expect(eventsOfType(away.events, 'heal')).toHaveLength(1);
   });
 
-  it('控えにいるハサミムシは回復を止めない (特性は場でのみ発動 SPEC §3)', () => {
-    const state = makeBattle(['bara', 'hasamimushi'], ['kenro']);
+  it('控えにいるカマキリは回復を止めない (特性は場でのみ発動 SPEC §3)', () => {
+    const state = makeBattle(['bara', 'kamakiri'], ['kenro']);
     setHp(state, 'p2', 0, 100);
 
     const { events } = resolveTurn(state, { p1: move(0), p2: move(0) });
