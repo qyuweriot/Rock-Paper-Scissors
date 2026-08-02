@@ -364,6 +364,92 @@ describe('effectOf — 相性補正', () => {
   });
 });
 
+/**
+ * 攻撃側の演出。**攻撃技のときだけ踏み込む** ─
+ * 反動で自分が踏み込んだり、毒で誰かが踏み込んだりすると意味が通らない。
+ */
+describe('effectOf — 攻撃側', () => {
+  it('攻撃技のダメージは攻撃側を持つ。被弾側の相手になる', () => {
+    const state = makeBattle(['ishi'], ['bara']);
+    const { events } = resolveTurn(state, { p1: move(0), p2: move(0) });
+    const frames = buildFrames(state, events, noRevealed(), HOTSEAT_LABELS);
+
+    const hit = frames.find(
+      (f) => f.event.type === 'damage' && f.event.source === 'move' && f.event.target.side === 'p2',
+    );
+    if (!hit) throw new Error('攻撃ダメージのコマがありません');
+
+    expect(effectOf(hit)?.attacker).toEqual({ side: 'p1', partyIndex: 0 });
+  });
+
+  it('固定ダメージでも踏み込む。相性の有無とは別の話', () => {
+    // 手のひら 技0 は固定20。相性は付かないが攻撃ではある
+    const state = makeBattle(['tenohira'], ['ishi']);
+    const { events } = resolveTurn(state, { p1: move(0), p2: move(0) });
+    const frames = buildFrames(state, events, noRevealed(), HOTSEAT_LABELS);
+
+    const hit = frames.find(
+      (f) => f.event.type === 'damage' && f.event.source === 'move' && f.event.target.side === 'p2',
+    );
+    if (!hit) throw new Error('攻撃ダメージのコマがありません');
+
+    const effect = effectOf(hit);
+    expect(effect?.attacker).toEqual({ side: 'p1', partyIndex: 0 });
+    expect(effect?.matchup).toBeNull();
+  });
+
+  it('反動・反射・毒・設置は攻撃側を持たない', () => {
+    // 粉砕 gu → 山嵐 choki。有利対面で殴り、反動と反射が同時に出る
+    const state = makeBattle(['funsai'], ['yamaarashi']);
+    setHp(state, 'p2', 0, 140); // 一撃で倒れないようにして反動を出す
+    const { events } = resolveTurn(state, { p1: move(0), p2: move(0) });
+    const frames = buildFrames(state, events, noRevealed(), HOTSEAT_LABELS);
+
+    let sawMove = false;
+    let sawOther = false;
+    for (const frame of frames) {
+      if (frame.event.type !== 'damage') continue;
+      const attacker = effectOf(frame)?.attacker;
+      if (frame.event.source === 'move') {
+        sawMove = true;
+        expect(attacker).not.toBeNull();
+      } else {
+        sawOther = true;
+        expect(attacker, `${frame.event.source} の攻撃側`).toBeNull();
+      }
+    }
+    expect(sawMove && sawOther).toBe(true); // 両方を実際に通っている
+  });
+
+  it('回復・瀕死・交代・毒付与・修正値は攻撃側を持たない', () => {
+    const state = makeBattle(['ishi'], ['kenro']);
+    const frame = (event: Parameters<typeof applyEvent>[1]) =>
+      buildFrames(state, [event], noRevealed(), HOTSEAT_LABELS)[0]!;
+
+    expect(effectOf(frame({ type: 'heal', target: { side: 'p1', partyIndex: 0 }, amount: 5 }))?.attacker).toBeNull();
+    expect(effectOf(frame({ type: 'faint', target: { side: 'p1', partyIndex: 0 } }))?.attacker).toBeNull();
+    expect(
+      effectOf(frame({ type: 'poisonApplied', target: { side: 'p2', partyIndex: 0 }, stacks: 1 }))?.attacker,
+    ).toBeNull();
+  });
+
+  it('同じ段で両者が殴っても、攻撃側を取り違えない', () => {
+    // 手のひら pa と 石 gu。どちらも中速なので同じ段で解決される
+    const state = makeBattle(['tenohira'], ['ishi']);
+    const { events } = resolveTurn(state, { p1: move(0), p2: move(0) });
+    const frames = buildFrames(state, events, noRevealed(), HOTSEAT_LABELS);
+
+    const hits = frames.filter((f) => f.event.type === 'damage' && f.event.source === 'move');
+    expect(hits).toHaveLength(2);
+
+    for (const frame of hits) {
+      if (frame.event.type !== 'damage') continue;
+      // 攻撃側は必ず被弾側の相手
+      expect(effectOf(frame)?.attacker?.side).not.toBe(frame.event.target.side);
+    }
+  });
+});
+
 describe('設置ダメージも再生できる (SPEC §7.2)', () => {
   it('交代 → 設置ダメージ の連鎖がコマとして並ぶ', () => {
     const state = makeBattle(['ishi', 'bara'], ['kenro']);

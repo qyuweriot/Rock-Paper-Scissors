@@ -102,7 +102,7 @@ export function App() {
             dispatch({ type: 'declareReplacement', partyIndex })
           }
           onConfirmGate={() => dispatch({ type: 'confirmGate' })}
-          onStartPlayback={() => dispatch({ type: 'advancePlayback' })}
+          onAdvancePlayback={() => dispatch({ type: 'advancePlayback' })}
           onSkipPlayback={() => dispatch({ type: 'skipPlayback' })}
         />
       )}

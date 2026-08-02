@@ -12,7 +12,7 @@ import { useState } from 'react';
 import { getMove, getUnit, type UnitId } from '../../data/units';
 import type { Action, BattleState, Side, SlotIndex } from '../../engine/types';
 import { breakdownText, previewMove } from '../preview';
-import { HpBar } from './HpBar';
+import { UnitCard } from './UnitCard';
 
 interface Props {
   battle: BattleState;
@@ -34,10 +34,6 @@ function unitIdAt(battle: BattleState, side: Side, partyIndex: number): UnitId |
   return unit ? (unit.unitId as UnitId) : null;
 }
 
-/** 交代先ボタンに出す一行。何ができる相手か分からないと選べない */
-function slotName(slot: ReturnType<typeof getUnit>['slots'][number]): string {
-  return slot.kind === 'move' ? slot.move.name : slot.ability.name;
-}
 
 export function ActionPanel({ battle, side, actions, onDeclare }: Props) {
   /** 対象選択の途中。null なら技の一覧を出す */
@@ -77,28 +73,23 @@ export function ActionPanel({ battle, side, actions, onDeclare }: Props) {
             戻る
           </button>
         </div>
-        <div className="actions__grid">
+        {/* 控えを1体選ぶので、控えの詳細と同じカードで見せる */}
+        <div className="actions__grid actions__grid--cards">
           {pending.candidates.map((action) => {
             const target = action.kind === 'move' ? action.selection : undefined;
             const id = target ? unitIdAt(battle, target.side, target.partyIndex) : null;
             const unit = target ? battle.sides[target.side].party[target.partyIndex] : undefined;
             if (!id || !unit) return null;
-            const def = getUnit(id);
             return (
-              <button
+              <UnitCard
                 key={target?.partyIndex}
-                type="button"
-                className="btn btn--action"
+                unitId={id}
+                state={unit}
                 onClick={() => {
                   setPending(null);
                   onDeclare(action);
                 }}
-              >
-                <span className="btn__title">{def.name}</span>
-                <span className="btn__sub">
-                  HP {unit.hp} / {def.maxHp}
-                </span>
-              </button>
+              />
             );
           })}
         </div>
@@ -149,24 +140,19 @@ export function ActionPanel({ battle, side, actions, onDeclare }: Props) {
         {switches.length === 0 ? (
           <p className="actions__empty">控えに生存ユニットがいません</p>
         ) : (
-          <div className="actions__grid">
+          <div className="actions__grid actions__grid--cards">
             {switches.map((action) => {
               if (action.kind !== 'switch') return null;
               const id = unitIdAt(battle, side, action.toPartyIndex);
               const unit = battle.sides[side].party[action.toPartyIndex];
               if (!id || !unit) return null;
-              const def = getUnit(id);
               return (
-                <button
+                <UnitCard
                   key={action.toPartyIndex}
-                  type="button"
-                  className="btn btn--action"
+                  unitId={id}
+                  state={unit}
                   onClick={() => onDeclare(action)}
-                >
-                  <span className="btn__title">{def.name}</span>
-                  <span className="btn__sub">{def.slots.map(slotName).join(' / ')}</span>
-                  <HpBar hp={unit.hp} maxHp={def.maxHp} poisonStacks={unit.poisonStacks} />
-                </button>
+                />
               );
             })}
           </div>

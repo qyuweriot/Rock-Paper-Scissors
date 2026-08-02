@@ -14,6 +14,7 @@ import { TEAM_SIZE } from '../../engine/constants';
 import type { Side } from '../../engine/types';
 import { UnitCard } from '../components/UnitCard';
 import { UnitDetail } from '../components/UnitDetail';
+import { sortForDisplay } from '../order';
 
 /** 左から右への並び。バトル画面の BattleStage と揃える */
 const ORDER: readonly Side[] = ['p1', 'p2'];
@@ -42,7 +43,11 @@ export function SelectionScreen({ side, own, opponent, labels, showSide, onSubmi
   };
 
   const full = team.length === TEAM_SIZE;
-  const partyOf = (target: Side) => (target === side ? own : opponent);
+  /**
+   * 編成で押した順ではなく表示順で並べる (→ ui/order.ts)。
+   * **選出の順番とは別物。** 何番目に選んだかは select-slot__order のバッジが示す。
+   */
+  const partyOf = (target: Side) => sortForDisplay(target === side ? own : opponent);
 
   return (
     <div className="screen screen--select">

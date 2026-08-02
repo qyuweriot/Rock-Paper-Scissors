@@ -7,13 +7,14 @@
  */
 
 import { useState } from 'react';
-import { getUnit, type UnitId } from '../../data/units';
+import type { UnitId } from '../../data/units';
 import type { Action, BattleState, Side } from '../../engine/types';
 import { ActionPanel } from '../components/ActionPanel';
 import { BattleLog } from '../components/BattleLog';
 import { BattleStage } from '../components/BattleStage';
-import { HpBar } from '../components/HpBar';
 import { PanelGate } from '../components/PanelGate';
+import { PartyDetail } from '../components/PartyDetail';
+import { UnitCard } from '../components/UnitCard';
 import { UnitDetail } from '../components/UnitDetail';
 import {
   activeInputSide,
@@ -37,7 +38,12 @@ interface Props {
   onDeclareReplacement: (partyIndex: number) => void;
   /** 秘匿ゲートを通過する (対人戦) */
   onConfirmGate: () => void;
-  onStartPlayback: () => void;
+  /**
+   * 再生を1コマ進める。**開始待ちなら再生を始める** ─
+   * リデューサの advancePlayback が両方をこなすので、呼び口は1つでよい。
+   */
+  onAdvancePlayback: () => void;
+  /** 残りを全部飛ばす。上部のボタン専用 */
   onSkipPlayback: () => void;
 }
 
@@ -48,11 +54,13 @@ export function BattleScreen({
   onDeclareAction,
   onDeclareReplacement,
   onConfirmGate,
-  onStartPlayback,
+  onAdvancePlayback,
   onSkipPlayback,
 }: Props) {
   /** 控えの詳細。秘匿の判定は開く前に済ませてある (SPEC §11) */
   const [detail, setDetail] = useState<{ side: Side; partyIndex: number } | null>(null);
+  /** 編成5体の一覧。相互公開の情報なので誰の分でも開いてよい (SPEC §1) */
+  const [partyOf, setPartyOf] = useState<Side | null>(null);
 
   const viewer = activeInputSide(state);
   const turn = state.turn;
@@ -68,9 +76,12 @@ export function BattleScreen({
       <header className="battle-head">
         <span className="battle-head__turn">{battle.turn} ターン目</span>
         {playing && !awaiting && (
-          <button type="button" className="btn btn--skip" onClick={onSkipPlayback}>
-            スキップ ▸▸
-          </button>
+          <>
+            <span className="battle-head__hint">画面をタップで次へ</span>
+            <button type="button" className="btn btn--skip" onClick={onSkipPlayback}>
+              スキップ ▸▸
+            </button>
+          </>
         )}
       </header>
 
@@ -81,16 +92,21 @@ export function BattleScreen({
         effectKey={state.playback?.index ?? -1}
         isVisible={(side, partyIndex) => isUnitVisible(state, side, partyIndex, viewer)}
         onSelectBench={(side, partyIndex) => setDetail({ side, partyIndex })}
+        onShowParty={(side) => setPartyOf(side)}
         caption={frame?.entry.text ?? null}
       />
 
-      {/* 再生中は画面全体がスキップ用の当たり判定になる。開始待ちは対象外 */}
+      {/*
+        再生中は画面全体が「次へ」の当たり判定になる。開始待ちは対象外
+        (確認せずに再生が始まってしまう)。
+        **最後まで飛ばすのは上部のボタンの役割**で、ここは1コマずつ送る。
+      */}
       {playing && !awaiting && (
         <button
           type="button"
           className="playback-skip-layer"
-          aria-label="再生をスキップ"
-          onClick={onSkipPlayback}
+          aria-label="1コマ進める"
+          onClick={onAdvancePlayback}
         />
       )}
 
@@ -104,7 +120,7 @@ export function BattleScreen({
             title="2人とも画面を見ていますか?"
             hint="行動を公開してターンを解決します"
             label="再生する"
-            onConfirm={onStartPlayback}
+            onConfirm={onAdvancePlayback}
           />
         )}
 
@@ -147,22 +163,18 @@ export function BattleScreen({
         {!playing && turn?.kind === 'awaitReplacement' && (
           <>
             <p className="panel__prompt">{labels[turn.side]} の交代先を選んでください</p>
-            <div className="actions__grid">
+            {/* 控えを1体選ぶので、控えの詳細と同じカードで見せる */}
+            <div className="actions__grid actions__grid--cards">
               {replacementOptions(state, turn.side).map((index) => {
                 const unit = (state.battle ?? battle).sides[turn.side].party[index];
                 if (!unit) return null;
-                const def = getUnit(unit.unitId as UnitId);
                 return (
-                  <button
+                  <UnitCard
                     key={index}
-                    type="button"
-                    className="btn btn--action"
+                    unitId={unit.unitId as UnitId}
+                    state={unit}
                     onClick={() => onDeclareReplacement(index)}
-                  >
-                    <span className="btn__title">{def.name}</span>
-                    <span className="btn__sub">{def.slots.map(slotLabel).join(' / ')}</span>
-                    <HpBar hp={unit.hp} maxHp={def.maxHp} poisonStacks={unit.poisonStacks} />
-                  </button>
+                  />
                 );
               })}
             </div>
@@ -179,11 +191,14 @@ export function BattleScreen({
           onClose={() => setDetail(null)}
         />
       )}
+
+      {partyOf && (
+        <PartyDetail
+          label={labels[partyOf]}
+          party={state.parties[partyOf]}
+          onClose={() => setPartyOf(null)}
+        />
+      )}
     </div>
   );
-}
-
-/** 交代先ボタンに出す一行。何ができる相手か分からないと選べない */
-function slotLabel(slot: ReturnType<typeof getUnit>['slots'][number]): string {
-  return slot.kind === 'move' ? slot.move.name : slot.ability.name;
 }

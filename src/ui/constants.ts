@@ -13,7 +13,7 @@ import type { BattleEvent } from '../engine/types';
  * **変えたら index.css の `--fx` も同じ値にすること。**
  * CSS のアニメーションがコマの表示時間より長いと、途中で要素ごと消えて切られる。
  */
-export const PLAYBACK_SCALE = 1.45;
+export const PLAYBACK_SCALE = 2.6;
 
 /**
  * 種別ごとの相対的な重さ。**比率だけを持ち、実時間は SCALE を掛けて決まる。**

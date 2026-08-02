@@ -2,7 +2,10 @@
  * HPバー。数値も併記する(バーだけだと残量が読み取れない)。
  *
  * 毒を持つユニットは、**ターン終了時に消えるぶんを別色で塗り分ける** (SPEC §7.1)。
- * 「毒2」バッジから −20 を暗算させないため。
+ * 何点消えるかを暗算させないための仕掛け。
+ *
+ * **文字での毒の説明はここに出さない。** 数値 (`毒 2重 (20/ターン)`) は
+ * StatusBadges が出しており、二重に言うことになる。ここは色分けだけを受け持つ。
  */
 
 import { POISON_DAMAGE } from '../../engine/constants';
@@ -41,11 +44,6 @@ export function HpBar({ hp, maxHp, poisonStacks = 0 }: Props) {
       </div>
       <span className="hp__text">
         {current} / {maxHp}
-        {poison > 0 && (
-          <em className="hp__poison">
-            {lethal ? '毒で瀕死' : `毒 −${String(poison)}`}
-          </em>
-        )}
       </span>
     </div>
   );

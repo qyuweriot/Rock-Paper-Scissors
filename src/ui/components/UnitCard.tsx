@@ -7,7 +7,8 @@
 import { getUnit, type UnitId } from '../../data/units';
 import type { UnitState } from '../../engine/types';
 import { HIDDEN_ICON, UNIT_ICONS } from '../icons';
-import { ATTRIBUTE_LABELS, SPEED_LABELS } from '../labels';
+import { ATTRIBUTE_LABELS } from '../labels';
+import { SpeedBadge } from './SpeedBadge';
 import { HpBar } from './HpBar';
 import { StatusBadges } from './StatusBadges';
 
@@ -46,13 +47,22 @@ export function UnitCard({ unitId, state, onClick, selected, disabled, hidden, c
 
   const body = (
     <>
+      {/*
+        「アイコン + 名前」と「属性 + 速度」の1行。**折り返さない** ─
+        折り返しが列幅や属性名の長さで変わると、カードごとにHPバーの高さがずれる。
+      */}
       <div className="unit-card__head">
-        <span className={`unit-card__icon unit-card__icon--${def.attribute}`}>
-          {UNIT_ICONS[unitId]}
+        <span className="unit-card__title">
+          <span className={`unit-card__icon unit-card__icon--${def.attribute}`}>
+            {UNIT_ICONS[unitId]}
+          </span>
+          <span className="unit-card__name">{def.name}</span>
         </span>
-        <span className="unit-card__name">{def.name}</span>
         <span className="unit-card__tags">
-          {ATTRIBUTE_LABELS[def.attribute]} / 速度{SPEED_LABELS[def.speed]}
+          <span className={`attr-label attr-label--${def.attribute}`}>
+            {ATTRIBUTE_LABELS[def.attribute]}
+          </span>
+          <SpeedBadge speed={def.speed} />
         </span>
       </div>
 

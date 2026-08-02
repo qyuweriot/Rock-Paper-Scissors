@@ -184,6 +184,11 @@ export function buildFrames(
 /** 画面に出す演出。コンポーネントはこれだけを見る */
 export interface Effect {
   target: UnitRef;
+  /**
+   * 攻撃を仕掛けた側。**攻撃技によるダメージのときだけ**入る。
+   * 反動・反射・毒・設置は null ─ 自傷や場の効果に「踏み込み」の絵は合わない。
+   */
+  attacker: UnitRef | null;
   kind: 'damage' | 'heal' | 'faint' | 'switch' | 'poison' | 'modifier';
   /** ダメージ量・回復量・修正値。演出だけのものは null */
   amount: number | null;
@@ -207,8 +212,24 @@ const SOURCE_NOTES = {
   reflect: '反射',
 } as const;
 
-/** 相性を持たない演出の共通部分 */
-const NO_MATCHUP = { matchup: null, typeModifier: null } as const;
+/** 攻撃でも相性でもない演出の共通部分 */
+const PASSIVE = { attacker: null, matchup: null, typeModifier: null } as const;
+
+/**
+ * そのダメージを与えた技を引く。**攻撃技によるダメージだけ**が対象。
+ *
+ * **攻撃者は「被弾側の相手が宣言した技」から引く。** 直近の moveUsed で引くと、
+ * 同じ段で両者が動いたとき `moveUsed(p1) → moveUsed(p2) → damage → damage` の順に
+ * 並ぶせいで取り違える。1ターンに1陣営1回しか技を使わない (SPEC §5.1) ので、
+ * 陣営で引けば一意に定まる。
+ *
+ * 反動は自分が対象になるが、`source === 'move'` で先に弾いているのでここには来ない。
+ */
+function inFlightOf(frame: Frame): InFlight | null {
+  const { event, moves } = frame;
+  if (event.type !== 'damage' || event.source !== 'move') return null;
+  return moves[event.target.side === 'p1' ? 'p2' : 'p1'] ?? null;
+}
 
 /**
  * そのダメージに相性補正が乗っていたか (SPEC §2)。乗っていなければ null。
@@ -216,18 +237,13 @@ const NO_MATCHUP = { matchup: null, typeModifier: null } as const;
  * 乗るのは**攻撃技による通常ダメージだけ**。固定ダメージ (手のひら技1) と
  * 毒・設置・反動・反射は相性を無視する (SPEC §4.2)。
  * 判定に `source` と `damage.kind` の両方が要るのはそのため。
- *
- * 攻撃者は「被弾側の相手が宣言した技」から引く。反動は自分が対象になるが、
- * `source === 'move'` で先に弾いているのでここには来ない。
  */
 function matchupOf(frame: Frame): { matchup: Matchup; typeModifier: number } | null {
-  const { event, moves, battle } = frame;
-  if (event.type !== 'damage' || event.source !== 'move') return null;
+  const { event, battle } = frame;
+  const inFlight = inFlightOf(frame);
+  if (event.type !== 'damage' || !inFlight) return null;
 
   const target = event.target;
-  const inFlight = moves[target.side === 'p1' ? 'p2' : 'p1'];
-  if (!inFlight) return null;
-
   const attacker = battle.sides[inFlight.attacker.side].party[inFlight.attacker.partyIndex];
   const defender = battle.sides[target.side].party[target.partyIndex];
   if (!attacker || !defender) return null;
@@ -251,6 +267,8 @@ export function effectOf(frame: Frame): Effect | null {
       const type = matchupOf(frame);
       return {
         target: event.target,
+        // 固定ダメージ (手のひら技1) も攻撃なので踏み込む。相性の有無とは別
+        attacker: inFlightOf(frame)?.attacker ?? null,
         kind: 'damage',
         amount: event.amount,
         note: SOURCE_NOTES[event.source],
@@ -261,13 +279,13 @@ export function effectOf(frame: Frame): Effect | null {
     }
 
     case 'heal':
-      return { target: event.target, kind: 'heal', amount: event.amount, note: null, ...NO_MATCHUP };
+      return { target: event.target, kind: 'heal', amount: event.amount, note: null, ...PASSIVE };
 
     case 'faint':
-      return { target: event.target, kind: 'faint', amount: null, note: null, ...NO_MATCHUP };
+      return { target: event.target, kind: 'faint', amount: null, note: null, ...PASSIVE };
 
     case 'switch':
-      return { target: event.to, kind: 'switch', amount: null, note: null, ...NO_MATCHUP };
+      return { target: event.to, kind: 'switch', amount: null, note: null, ...PASSIVE };
 
     case 'poisonApplied':
       return {
@@ -275,7 +293,7 @@ export function effectOf(frame: Frame): Effect | null {
         kind: 'poison',
         amount: event.stacks,
         note: '毒',
-        ...NO_MATCHUP,
+        ...PASSIVE,
       };
 
     case 'modifier':
@@ -284,7 +302,7 @@ export function effectOf(frame: Frame): Effect | null {
         kind: 'modifier',
         amount: event.value,
         note: event.axis === 'atk' ? '攻勢' : '守勢',
-        ...NO_MATCHUP,
+        ...PASSIVE,
       };
 
     default:

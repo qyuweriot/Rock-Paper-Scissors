@@ -11,7 +11,8 @@
 import { getUnit, type UnitId } from '../../data/units';
 import type { BattleState, Side } from '../../engine/types';
 import { UNIT_ICONS } from '../icons';
-import { ATTRIBUTE_LABELS, SPEED_LABELS } from '../labels';
+import { ATTRIBUTE_LABELS } from '../labels';
+import { SpeedBadge } from './SpeedBadge';
 import type { Effect } from '../playback';
 import { breakdownText, previewMove } from '../preview';
 import { HpBar } from './HpBar';
@@ -24,11 +25,13 @@ interface Props {
   facing: 'left' | 'right';
   /** いま再生中のエフェクト。この陣営の場のユニットが対象のときだけ渡ってくる */
   effect: Effect | null;
+  /** この陣営が攻撃を仕掛けた側か。中央へ踏み込む */
+  attacking: boolean;
   /** エフェクトを再生し直すための鍵。コマが変わるたびに変える */
   effectKey: number;
 }
 
-export function StageUnit({ battle, side, facing, effect, effectKey }: Props) {
+export function StageUnit({ battle, side, facing, effect, attacking, effectKey }: Props) {
   const sideState = battle.sides[side];
   const unit = sideState.party[sideState.activeIndex];
   if (!unit) return null;
@@ -36,10 +39,20 @@ export function StageUnit({ battle, side, facing, effect, effectKey }: Props) {
   const def = getUnit(unit.unitId as UnitId);
   // 相性も class に出す。有利対面は揺れを強くする
   const matchup = effect?.matchup && effect.matchup !== 'neutral' ? ` is-${effect.matchup}` : '';
-  const animation = effect ? `is-${effect.kind}${matchup}` : '';
+  // 被弾と踏み込みは同じコマには来ない (1コマ = 1イベント) ので排他でよい
+  const animation = effect ? `is-${effect.kind}${matchup}` : attacking ? 'is-attacking' : '';
+
+  const className = [
+    'stage-unit',
+    `stage-unit--${facing}`,
+    `stage-unit--${def.attribute}`,
+    unit.fainted ? 'is-fainted' : '',
+  ]
+    .filter(Boolean)
+    .join(' ');
 
   return (
-    <div className={`stage-unit stage-unit--${facing} ${unit.fainted ? 'is-fainted' : ''}`}>
+    <div className={className}>
       <div className="stage-unit__main">
         <div key={`${String(effectKey)}-icon`} className={`stage-unit__icon ${animation}`}>
           <span className={`stage-unit__emoji stage-unit__emoji--${def.attribute}`}>
@@ -52,7 +65,10 @@ export function StageUnit({ battle, side, facing, effect, effectKey }: Props) {
           <div className="stage-unit__name-row">
             <span className="stage-unit__name">{def.name}</span>
             <span className="stage-unit__tags">
-              {ATTRIBUTE_LABELS[def.attribute]} / 速度{SPEED_LABELS[def.speed]}
+              <span className={`attr-label attr-label--${def.attribute}`}>
+                {ATTRIBUTE_LABELS[def.attribute]}
+              </span>
+              <SpeedBadge speed={def.speed} />
             </span>
           </div>
           <HpBar hp={unit.hp} maxHp={def.maxHp} poisonStacks={unit.poisonStacks} />

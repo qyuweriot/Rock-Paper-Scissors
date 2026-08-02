@@ -6,10 +6,11 @@
  */
 
 import { useState } from 'react';
-import { UNIT_IDS, type UnitId } from '../../data/units';
+import type { UnitId } from '../../data/units';
 import { PARTY_SIZE } from '../../engine/constants';
 import { draftParty } from '../../ai/draft';
 import { UnitCard } from '../components/UnitCard';
+import { UNIT_DISPLAY_ORDER } from '../order';
 import { HOTSEAT_LABELS } from '../log';
 import type { Side } from '../../engine/types';
 
@@ -65,8 +66,9 @@ export function PartyScreen({ side, showSide, onSubmit }: Props) {
         </div>
       </header>
 
+      {/* 並びは UNIT_IDS ではなく表示順で固定する (→ ui/order.ts) */}
       <div className="unit-grid">
-        {UNIT_IDS.map((id) => (
+        {UNIT_DISPLAY_ORDER.map((id) => (
           <UnitCard
             key={id}
             unitId={id}

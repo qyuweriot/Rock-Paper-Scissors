@@ -48,10 +48,11 @@ describe('PLAYBACK_MS', () => {
     }
   });
 
-  it('1ターン最大9コマでも合計が15秒を超えない', () => {
-    // 意図的に遅くしてある (PLAYBACK_SCALE)。上限は「待たされすぎない」ための歯止め
+  it('1ターン最大9コマでも合計が25秒を超えない', () => {
+    // 意図的に遅くしてある (PLAYBACK_SCALE)。上限は「待たされすぎない」ための粗い歯止め。
+    // 最長のコマ(瀕死)が9回続くことは実際にはないので、かなり甘めの見積もり
     const longest = Math.max(...Object.values(PLAYBACK_MS));
-    expect(longest * 9).toBeLessThan(15_000);
+    expect(longest * 9).toBeLessThan(25_000);
   });
 
   /**

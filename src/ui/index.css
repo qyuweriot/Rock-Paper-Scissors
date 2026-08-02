@@ -22,7 +22,13 @@
    * アニメーションの尺の倍率。**ui/constants.ts の PLAYBACK_SCALE と同じ値にすること。**
    * コマの表示時間より長いアニメーションは、途中で要素ごと消えて切られる。
    */
-  --fx: 1.45;
+  --fx: 2.6;
+
+  /*
+   * HP数値の欄の幅。**名前行のグリッドと共有して縦の対応を作る。**
+   * 「120 / 120」(最長) と「チョキ + 速度バッジ」の両方が収まる幅にしてある。
+   */
+  --hp-text-width: 5.5rem;
 }
 
 /*
@@ -61,7 +67,8 @@ button {
 }
 
 .app {
-  max-width: 60rem;
+  /* 表示幅のつまみ。寸法は全部 rem なのでここ1行で盤面の余裕が変わる */
+  max-width: 72rem;
   margin: 0 auto;
   padding: 1.5rem 1rem 4rem;
 }
@@ -206,8 +213,17 @@ button {
   grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr));
 }
 
+/*
+ * **`<button>` は箱が中身より高いとき、中身を縦中央に置く** (UA の既定)。
+ * グリッドの既定は align-items: stretch なので、同じ行のカードは一番高いものに
+ * 合わせて伸び、短いカードだけ中身が下に押し下げられていた。
+ * 縦並びの flex にすると、ボタンでも div でも中身が上端から始まる。
+ */
 .unit-card {
-  display: block;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
   width: 100%;
   padding: 0.75rem;
   border: 1px solid var(--border);
@@ -261,27 +277,45 @@ button.unit-card:disabled {
   font-size: 1.5rem;
 }
 
+/*
+ * 「アイコン + 名前」を左、「属性 + 速度」を右に置いた1行。
+ * **flex-wrap: nowrap が要点。** 折り返しを許すと、列幅と属性名の長さ
+ * (グー2文字 / チョキ3文字) で1行になったり2行になったりして、
+ * カードごとにHPバーの高さがずれる。
+ */
 .unit-card__head {
   display: flex;
-  align-items: baseline;
+  flex-wrap: nowrap;
+  align-items: center;
   justify-content: space-between;
   gap: 0.5rem;
 }
 
-.unit-card__icon {
-  margin-right: 0.35rem;
-  font-size: 1.35rem;
-  line-height: 1;
+.unit-card__title {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-width: 0;
 }
 
+.unit-card__icon {
+  font-size: 1.35rem;
+  line-height: 1.3;
+}
+
+/* ステージと同じ理由で折らない (→ .stage-unit__name) */
 .unit-card__name {
+  flex: 0 0 auto;
+  min-width: 4em;
   font-weight: 700;
   font-size: 1.05rem;
+  white-space: nowrap;
 }
 
 .unit-card__tags {
-  font-size: 0.75rem;
-  color: var(--muted);
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
   white-space: nowrap;
 }
 
@@ -404,17 +438,14 @@ button.unit-card:disabled {
   50% { opacity: 0.45; }
 }
 
-.hp__poison {
-  margin-left: 0.3rem;
-  font-style: normal;
-  color: #d9a6e8;
-}
-
+/* 幅を固定する。桁数で欄が伸び縮みすると、上の名前行との対応が崩れる */
 .hp__text {
+  width: var(--hp-text-width);
   font-size: 0.75rem;
   color: var(--muted);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
+  text-align: center;
 }
 
 .badges {
@@ -517,11 +548,16 @@ button.unit-card:disabled {
 
 /* --- バトル: 対面ステージ ------------------------------------------------ */
 
+/*
+ * スキップボタンは再生中しか出ない。**先に高さを確保しておく** ─
+ * 出た瞬間に行が伸びると、下の盤面ごと画面が跳ねる。
+ */
 .battle-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 0.5rem;
+  min-height: 2.6rem;
   margin-bottom: 0.6rem;
 }
 
@@ -529,6 +565,15 @@ button.unit-card:disabled {
   font-size: 0.85rem;
   color: var(--muted);
   font-variant-numeric: tabular-nums;
+}
+
+/* タップで送れることは画面から分からないので添える。横幅しか変わらない */
+.battle-head__hint {
+  margin-right: auto;
+  margin-left: 0.75rem;
+  font-size: 0.75rem;
+  color: var(--muted);
+  opacity: 0.8;
 }
 
 .btn--skip {
@@ -557,42 +602,74 @@ button.unit-card:disabled {
 .stage {
   display: grid;
   grid-template-columns: 1fr 1fr;
+  /*
+   * meta を独立した行に置く。**同じ grid 行に入れば高さが自動で揃う**ので、
+   * 設置バッジが片側にだけ付いても、控えの数が左右で違っても、
+   * カードの上端がずれない。陣営ごとのラッパーで包むとこれができない。
+   */
   grid-template-areas:
-    'left right'
-    'divider divider';
-  gap: 0.5rem;
+    'meta-left meta-right'
+    'unit-left unit-right'
+    'divider divider'
+    'caption caption';
+  gap: 0.35rem 0.5rem;
   margin-bottom: 1rem;
 }
 
-.stage__side {
-  position: relative;
+/*
+ * **行を明示する。折り返しに任せない。**
+ * 1行目にラベルと設置の印、2行目に控え。1本の flex-wrap で並べていたときは
+ * 控えの幅次第で折り返す位置が変わり、片側だけ横に残って左右で揃わなかった。
+ */
+.stage__meta {
+  display: grid;
+  grid-template-rows: auto auto;
+  gap: 0.3rem;
+  align-content: start;
   min-width: 0;
 }
 
-.stage__side--left {
-  grid-area: left;
-}
-.stage__side--right {
-  grid-area: right;
-}
-
-.stage__meta {
+.stage__meta-head {
   display: flex;
   align-items: center;
-  gap: 0.4rem;
-  flex-wrap: wrap;
-  margin-bottom: 0.35rem;
+  gap: 0.5rem;
+}
+
+.stage__meta--left {
+  grid-area: meta-left;
 }
 
 /* 右の列は内容を右端に寄せて、中央で向かい合っているように見せる */
-.stage__side--right .stage__meta {
+.stage__meta--right {
+  grid-area: meta-right;
+}
+
+.stage__meta--right .stage__meta-head,
+.stage__meta--right .bench-dots {
   justify-content: flex-end;
 }
 
-/* 設置バッジの有無で行数が変わり、片方のカードだけ下にずれるのを防ぐ */
-.stage__meta {
-  min-height: 3.2rem;
-  align-content: flex-start;
+.stage-unit--left {
+  grid-area: unit-left;
+}
+.stage-unit--right {
+  grid-area: unit-right;
+}
+
+/* 編成5体を見返すための入口。相互公開の情報なのでどちらの陣営でも開ける (SPEC §1) */
+.stage__party-button {
+  padding: 0.1rem 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--muted);
+  font-size: 0.72rem;
+  cursor: pointer;
+}
+
+.stage__party-button:hover {
+  border-color: var(--accent);
+  color: var(--text);
 }
 
 .stage__label {
@@ -606,7 +683,7 @@ button.unit-card:disabled {
   align-items: center;
   justify-content: center;
   gap: 0.75rem;
-  margin: 0.25rem 0 0;
+  margin: 0.5rem 0 0;
 }
 
 .stage__divider::before,
@@ -624,19 +701,34 @@ button.unit-card:disabled {
   color: var(--muted);
 }
 
-/* 再生中に「いま何が起きているか」を中央に出す */
+/*
+ * 再生中に「いま何が起きているか」を出す帯。**再生を目で追うための主役。**
+ *
+ * 以前は VS の横に置いて nowrap + ellipsis で切っていたが、
+ * 読ませたい文言を切っていては意味がない。全幅で折り返す。
+ *
+ * 行そのものは常に置いて高さを確保する。出たり消えたりすると操作欄が毎コマ跳ねる。
+ */
+.stage__caption-row {
+  grid-area: caption;
+  display: grid;
+  place-items: center;
+  min-height: 3.6rem;
+  padding: 0 0.25rem;
+}
+
 .stage__caption {
-  flex: 0 1 auto;
-  max-width: 60%;
-  padding: 0.2rem 0.7rem;
-  border: 1px solid var(--accent);
-  border-radius: 999px;
+  width: 100%;
+  padding: 0.6rem 1rem;
+  border: 2px solid var(--accent);
+  border-radius: 0.6rem;
   background: var(--surface-2);
+  box-shadow: 0 0 0.9rem rgba(110, 168, 254, 0.25);
   color: var(--text);
-  font-size: 0.8rem;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  font-size: 1.15rem;
+  font-weight: 600;
+  line-height: 1.4;
+  text-align: center;
   animation: caption-in calc(var(--fx) * 200ms) ease-out;
 }
 
@@ -650,6 +742,7 @@ button.unit-card:disabled {
 /* --- ステージ上の1体 ----------------------------------------------------- */
 
 .stage-unit {
+  min-width: 0;
   padding: 0.75rem;
   border: 1px solid var(--border);
   border-radius: 0.75rem;
@@ -657,13 +750,47 @@ button.unit-card:disabled {
   transition: opacity 0.3s;
 }
 
+/*
+ * 属性を枠の色で示す (選出画面のカードと同じ考え方)。
+ * **色を置くのは外側の端。** 向かい合わせなので、外側に置くと2枚が対に見える。
+ */
+.stage-unit--left {
+  border-left-width: 5px;
+}
+.stage-unit--right {
+  border-right-width: 5px;
+}
+
+.stage-unit--gu.stage-unit--left {
+  border-left-color: var(--gu);
+}
+.stage-unit--gu.stage-unit--right {
+  border-right-color: var(--gu);
+}
+.stage-unit--choki.stage-unit--left {
+  border-left-color: var(--choki);
+}
+.stage-unit--choki.stage-unit--right {
+  border-right-color: var(--choki);
+}
+.stage-unit--pa.stage-unit--left {
+  border-left-color: var(--pa);
+}
+.stage-unit--pa.stage-unit--right {
+  border-right-color: var(--pa);
+}
+
 .stage-unit.is-fainted {
   opacity: 0.4;
 }
 
+/*
+ * **上端で揃える。** align-items: center だと info の高さの違いでアイコンが上下に動き、
+ * 左右のユニットで名前やHPの高さが合わなくなる。
+ */
 .stage-unit__main {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 0.6rem;
 }
 
@@ -672,14 +799,10 @@ button.unit-card:disabled {
   flex-direction: row-reverse;
 }
 
-/* 鏡写しにするのはアイコンとHPの並びだけ。技リストの本文は左寄せのまま読ませる */
-.stage-unit--right .stage-unit__name-row {
-  text-align: right;
-}
-
-.stage-unit--right .badges {
-  justify-content: flex-end;
-}
+/*
+ * **鏡写しにするのはアイコンの位置だけ。** 名前や状態の揃えまで左右で変えると、
+ * 同じ情報が場所によって違う見え方になる。名前・属性・状態は左右とも中央に寄せる。
+ */
 
 /* 盤面の視線の中心。一律拡大に上乗せして大きくし、属性色の発光を強めて際立たせる */
 .stage-unit__icon {
@@ -687,15 +810,15 @@ button.unit-card:disabled {
   flex: 0 0 auto;
   display: grid;
   place-items: center;
-  width: 4rem;
-  height: 4rem;
+  width: 5.5rem;
+  height: 5.5rem;
   border-radius: 50%;
   background: var(--surface-2);
   border: 3px solid var(--border);
 }
 
 .stage-unit__emoji {
-  font-size: 2.2rem;
+  font-size: 3.1rem;
   line-height: 1;
 }
 
@@ -714,22 +837,92 @@ button.unit-card:disabled {
   min-width: 0;
 }
 
+/* 状態バッジも名前と同じ中央に。名前だけ中央で状態が端だとちぐはぐになる */
+.stage-unit__info .badges {
+  justify-content: center;
+}
+
+/*
+ * **下のHP行と同じ列割りにする。** 名前はバーの中央の真上、属性と速度は
+ * HP数値の真上に来る。`.hp` は flex (track が flex:1、数値が固定幅) なので、
+ * 同じ幅と同じ gap を使えば列の切れ目が厳密に一致する。
+ */
 .stage-unit__name-row {
-  display: flex;
+  display: grid;
+  grid-template-columns: 1fr var(--hp-text-width);
   align-items: baseline;
-  justify-content: space-between;
   gap: 0.5rem;
 }
 
+/* それぞれの列の中央へ。はみ出しても中央を軸に対称になる */
+.stage-unit__name,
+.stage-unit__tags {
+  justify-self: center;
+}
+
+/*
+ * **名前は絶対に折らない。** 属性と速度のバッジは nowrap なので縮まず、
+ * 何もしないと名前だけが縮んで「カマキ / リ」と割れる。
+ * 4em は名前自身の字送りに対する4文字ぶん ─ 全15種の最長 (手のひら / カマキリ /
+ * ゴースト) がこれに収まる。短い名前でも同じ幅を取るので右端が動かない。
+ */
 .stage-unit__name {
+  flex: 0 0 auto;
+  min-width: 4em;
   font-size: 1.1rem;
   font-weight: 700;
+  white-space: nowrap;
 }
 
 .stage-unit__tags {
-  font-size: 0.72rem;
-  color: var(--muted);
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
   white-space: nowrap;
+}
+
+/* 属性は枠色と揃える。色だけに頼らず文字も残す */
+.attr-label {
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.attr-label--gu {
+  color: var(--gu);
+}
+.attr-label--choki {
+  color: var(--choki);
+}
+.attr-label--pa {
+  color: var(--pa);
+}
+
+/*
+ * 速度は行動順を決める要 (SPEC §5.2)。「速度速」と地の文で小さく出していたのをやめ、
+ * 1文字のバッジにして色で速い/遅いが分かるようにする。
+ */
+.speed-badge {
+  display: inline-grid;
+  place-items: center;
+  min-width: 1.6rem;
+  padding: 0.05rem 0.3rem;
+  border-radius: 0.3rem;
+  font-size: 0.95rem;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.speed-badge--fast {
+  background: rgba(110, 168, 254, 0.2);
+  color: #9cc6ff;
+}
+.speed-badge--mid {
+  background: rgba(154, 154, 164, 0.18);
+  color: #c4c4ce;
+}
+.speed-badge--slow {
+  background: rgba(224, 178, 92, 0.18);
+  color: #e8c88c;
 }
 
 /* 効果テキストは常に出す (PLAN §296) */
@@ -799,8 +992,10 @@ button.unit-card:disabled {
 
 /* --- 控えの丸 ------------------------------------------------------------ */
 
+/* 入らないときは丸ごと次の行へ (中身は下の nowrap で折らせない) */
 .bench-dots {
   display: flex;
+  flex-wrap: wrap;
   gap: 0.3rem;
   margin: 0;
   padding: 0;
@@ -811,11 +1006,13 @@ button.unit-card:disabled {
   display: flex;
   align-items: center;
   gap: 0.25rem;
-  padding: 0.15rem 0.5rem;
+  padding: 0.3rem 0.7rem;
   border: 1px solid var(--border);
   border-radius: 999px;
   background: var(--surface);
-  font-size: 0.72rem;
+  font-size: 0.95rem;
+  /* 「手のひ / ら」と割れないように。入らないときは .bench-dots 側が折り返す */
+  white-space: nowrap;
 }
 
 .bench-dot--fainted {
@@ -828,7 +1025,7 @@ button.unit-card:disabled {
 }
 
 .bench-dot__icon {
-  font-size: 1.05rem;
+  font-size: 1.5rem;
   line-height: 1;
 }
 
@@ -857,8 +1054,8 @@ button.unit-card:disabled {
   align-items: baseline;
   gap: 0.2rem;
   padding: 0.1rem 0.4rem;
-  border-radius: 0.35rem;
-  font-size: 1.05rem;
+  border-radius: 0.4rem;
+  font-size: 1.6rem;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
@@ -868,7 +1065,7 @@ button.unit-card:disabled {
 }
 
 .floating__note {
-  font-size: 0.68rem;
+  font-size: 0.85rem;
   font-weight: 600;
   font-style: normal;
   opacity: 0.85;
@@ -893,26 +1090,26 @@ button.unit-card:disabled {
 .floating--faint {
   color: var(--danger);
   background: rgba(224, 92, 92, 0.2);
-  font-size: 0.85rem;
+  font-size: 1.25rem;
 }
 
 /* 相性補正 (SPEC §2)。同じ技でも25 動く理由を数値の脇に出す */
 .floating__matchup {
-  font-size: 0.62rem;
+  font-size: 0.8rem;
   font-weight: 700;
   font-style: normal;
   letter-spacing: 0.02em;
 }
 
 .floating.is-advantage {
-  font-size: 1.35rem;
+  font-size: 2.1rem;
   color: #ffb27a;
   background: rgba(232, 132, 92, 0.22);
   box-shadow: 0 0 0.6rem rgba(232, 132, 92, 0.35);
 }
 
 .floating.is-disadvantage {
-  font-size: 0.95rem;
+  font-size: 1.35rem;
   color: #b6b6c0;
   background: rgba(120, 120, 135, 0.2);
 }
@@ -937,6 +1134,40 @@ button.unit-card:disabled {
   100% {
     opacity: 0;
     transform: translate(-50%, -1.8rem);
+  }
+}
+
+/*
+ * 攻撃した側は中央へ踏み込む。**攻撃技のときだけ** (→ playback.ts の Effect.attacker)。
+ * 反動や毒で自分が踏み込むと意味が通らない。
+ */
+.stage-unit__icon.is-attacking {
+  animation: lunge calc(var(--fx) * 480ms) ease-out;
+  border-color: var(--accent);
+}
+
+/* 左は右へ、右は左へ */
+.stage-unit--right .stage-unit__icon.is-attacking {
+  animation-name: lunge-right;
+}
+
+@keyframes lunge {
+  0%,
+  100% {
+    transform: translateX(0) scale(1);
+  }
+  40% {
+    transform: translateX(0.9rem) scale(1.08);
+  }
+}
+
+@keyframes lunge-right {
+  0%,
+  100% {
+    transform: translateX(0) scale(1);
+  }
+  40% {
+    transform: translateX(-0.9rem) scale(1.08);
   }
 }
 
@@ -1076,6 +1307,11 @@ button.unit-card:disabled {
   gap: 0.5rem;
 }
 
+/* 交代・対象選択はカードを並べる。効果テキストが入るぶん1列を広く取る */
+.actions__grid--cards {
+  grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr));
+}
+
 .actions__empty {
   margin: 0;
   color: var(--muted);
@@ -1185,7 +1421,7 @@ button.unit-card:disabled {
  * 狭い画面。**2列は崩さない** (配置が動かないことが要件) ので、
  * 縦積みにする代わりに字と余白を詰める。
  */
-@media (max-width: 40rem) {
+@media (max-width: 48rem) {
   .stage-unit {
     padding: 0.5rem;
   }
@@ -1205,23 +1441,17 @@ button.unit-card:disabled {
     width: 100%;
   }
 
-  .stage-unit__name-row {
-    flex-direction: column;
-    align-items: inherit;
-    gap: 0;
-  }
-
   .stage-unit__name {
     font-size: 0.95rem;
   }
 
   .stage-unit__icon {
-    width: 3.2rem;
-    height: 3.2rem;
+    width: 4.2rem;
+    height: 4.2rem;
   }
 
   .stage-unit__emoji {
-    font-size: 1.8rem;
+    font-size: 2.4rem;
   }
 
   .slot__text,
@@ -1248,8 +1478,8 @@ button.unit-card:disabled {
   display: flex;
   align-items: center;
   gap: 0.25rem;
-  margin: -0.15rem -0.5rem;
-  padding: 0.15rem 0.5rem;
+  margin: -0.3rem -0.7rem;
+  padding: 0.3rem 0.7rem;
   border: 0;
   border-radius: 999px;
   background: transparent;
@@ -1277,6 +1507,24 @@ button.unit-card:disabled {
   padding: 0;
   background: rgba(10, 10, 14, 0.75);
   cursor: pointer;
+}
+
+/* 編成一覧は5枚並ぶので広めに取る */
+.detail__panel--party {
+  width: min(30rem, 100%);
+}
+
+.detail__title {
+  margin: 0;
+  font-size: 1.1rem;
+  text-align: center;
+}
+
+.detail__note {
+  margin: 0;
+  font-size: 0.78rem;
+  color: var(--muted);
+  text-align: center;
 }
 
 .detail__panel {
@@ -1381,12 +1629,12 @@ button.unit-card:disabled {
   }
 
   .stage-unit__icon {
-    width: 5rem;
-    height: 5rem;
+    width: 7rem;
+    height: 7rem;
   }
 
   .stage-unit__emoji {
-    font-size: 2.8rem;
+    font-size: 4rem;
   }
 
   .screen--battle {

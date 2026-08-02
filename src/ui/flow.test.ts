@@ -393,6 +393,27 @@ describe('flow — ターン解決の再生', () => {
     expect(skipped.log.length).toBeGreaterThanOrEqual(state.playback?.frames.length ?? 0);
   });
 
+  /**
+   * 画面タップ = 1コマ送り / 上部のボタン = 最後まで飛ばす、と役割を分けてある。
+   * **両者が同じ結果になってしまっては分けた意味がない。**
+   */
+  it('1コマ送りと全飛ばしは別の結果になる', () => {
+    const state = playing();
+    expect(state.playback?.frames.length).toBeGreaterThan(2);
+
+    const stepped = reduce(state, { type: 'advancePlayback' });
+    const skipped = reduce(state, { type: 'skipPlayback' });
+
+    // 1コマ送りは再生中のまま次のコマへ
+    expect(isPlaying(stepped)).toBe(true);
+    expect(stepped.playback?.index).toBe(1);
+
+    // 全飛ばしは再生を終えて本編に戻る
+    expect(isPlaying(skipped)).toBe(false);
+    // 飛ばしてもログは全部残る。見逃しても後から読める
+    expect(skipped.log.length).toBeGreaterThan(displayLog(stepped).length);
+  });
+
   it('再生していないときの再生イベントは無視される', () => {
     const state = settle(playing());
     expect(reduce(state, { type: 'advancePlayback' })).toBe(state);

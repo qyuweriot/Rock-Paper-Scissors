@@ -19,6 +19,7 @@ import { SelectionScreen } from './screens/SelectionScreen';
 import { BattleScreen } from './screens/BattleScreen';
 import { ResultScreen } from './screens/ResultScreen';
 import { HandoffGate } from './components/HandoffGate';
+import { PartyDetail } from './components/PartyDetail';
 import {
   currentFrame,
   displayBattle,
@@ -34,6 +35,7 @@ import {
 } from './flow';
 import { getUnit, type UnitId } from '../data/units';
 import { UNIT_ICONS } from './icons';
+import { UNIT_DISPLAY_ORDER } from './order';
 
 const PARTY_A: UnitId[] = ['ishi', 'kenro', 'kami', 'utsuwa', 'magyu'];
 const PARTY_B: UnitId[] = ['hasami', 'ghost', 'bara', 'uchiwa', 'tenohira'];
@@ -76,7 +78,7 @@ const battleProps = (state: FlowState, mode: 'ai' | 'hotseat') => {
     onDeclareAction: noop,
     onDeclareReplacement: noop,
     onConfirmGate: noop,
-    onStartPlayback: noop,
+    onAdvancePlayback: noop,
     onSkipPlayback: noop,
   };
 };
@@ -277,18 +279,66 @@ describe('AI戦を通しで完走できる (PLAN §301)', () => {
   });
 });
 
+/**
+ * 並び順は UNIT_IDS ではなく UNIT_DISPLAY_ORDER で決まる。
+ * **押した順に左右されない**ことが要件なので、順序そのものを検査する。
+ */
+describe('ユニットの並び順', () => {
+  /** 名前が HTML に現れる順番を返す */
+  const orderOf = (html: string, ids: readonly UnitId[]): UnitId[] =>
+    [...ids].sort((a, b) => html.indexOf(getUnit(a).name) - html.indexOf(getUnit(b).name));
+
+  it('編成画面は表示順に15種を並べる', () => {
+    const html = renderToStaticMarkup(h(PartyScreen, { side: 'p1', showSide: true, onSubmit: noop }));
+    expect(orderOf(html, UNIT_DISPLAY_ORDER)).toEqual([...UNIT_DISPLAY_ORDER]);
+  });
+
+  it('選出画面は押した順ではなく表示順に並べる', () => {
+    // わざと表示順と逆に近い順で渡す
+    const picked: UnitId[] = ['magyu', 'utsuwa', 'kami', 'kenro', 'ishi'];
+    const html = renderToStaticMarkup(
+      h(SelectionScreen, {
+        side: 'p1',
+        own: picked,
+        opponent: PARTY_B,
+        labels: sideLabels('hotseat'),
+        showSide: true,
+        onSubmit: noop,
+      }),
+    );
+
+    const mine = html.slice(html.indexOf('select-column--left'), html.indexOf('select-column--right'));
+    expect(orderOf(mine, picked)).toEqual(['ishi', 'kenro', 'magyu', 'kami', 'utsuwa']);
+  });
+});
+
 describe('今回足した表示', () => {
   it('左右のステージ。左が p1、右が p2 で固定 (手番で入れ替わらない)', () => {
     for (const mode of ['ai', 'hotseat'] as const) {
       const html = renderToStaticMarkup(h(BattleScreen, battleProps(toBattle(mode), mode)));
-      const left = html.indexOf('stage__side--left');
-      const right = html.indexOf('stage__side--right');
+      const left = html.indexOf('stage-unit--left');
+      const right = html.indexOf('stage-unit--right');
 
       expect(left).toBeGreaterThanOrEqual(0);
       expect(left).toBeLessThan(right);
-      // 左の列に p1 の場のユニット (石) が入る
+      // 左のカードに p1 の場のユニット (石) が入る
       expect(html.slice(left, right)).toContain('石');
     }
+  });
+
+  /**
+   * 設置バッジや控えの数で meta の行数が変わっても、カードの上端がずれないこと。
+   * **meta と カードが同じ grid 行に入っている**ことで高さが揃う ─
+   * 陣営ごとのラッパーで包んでいたときはずれていた。
+   */
+  it('meta とカードが grid の別々の行にある (上端のずれ防止)', () => {
+    const html = renderToStaticMarkup(h(BattleScreen, battleProps(toBattle('ai'), 'ai')));
+
+    // 2つの meta が並んでから、2つのカードが並ぶ
+    expect(html.indexOf('stage__meta--left')).toBeLessThan(html.indexOf('stage__meta--right'));
+    expect(html.indexOf('stage__meta--right')).toBeLessThan(html.indexOf('stage-unit--left'));
+    // 陣営ごとのラッパーは残っていない
+    expect(html).not.toContain('stage__side');
   });
 
   it('技に「いま打ったら何ダメージか」が出る', () => {
@@ -296,6 +346,126 @@ describe('今回足した表示', () => {
     // 石 gu 技0 威力25 → はさみ choki は有利 (+25)
     expect(html).toContain('→ 50');
     expect(html).toContain('基本25 相性+25');
+  });
+
+  it('速度が「速度速」ではなく1文字のバッジで出る', () => {
+    const html = renderToStaticMarkup(h(BattleScreen, battleProps(toBattle('ai'), 'ai')));
+
+    // バッジの中身は1文字だけ。「速度」は title 属性にだけ残す
+    const badges = [...html.matchAll(/class="speed-badge[^"]*"[^>]*>([^<]*)</g)].map((m) => m[1]);
+    expect(badges.length).toBeGreaterThan(0);
+    for (const text of badges) {
+      expect(['速', '中', '遅']).toContain(text);
+    }
+
+    // 地の文としての「速度速」表記は残っていない
+    expect(html).not.toContain('>速度');
+    expect(html).not.toContain('速度速<');
+  });
+
+  it('対戦中のカードにも属性の色クラスが付く', () => {
+    const html = renderToStaticMarkup(h(BattleScreen, battleProps(toBattle('ai'), 'ai')));
+    // 石 (グー) が場にいる
+    expect(html).toContain('stage-unit--gu');
+    expect(html).toContain('attr-label--gu');
+  });
+
+  it('交代ボタンが控えの詳細と同じカードになっている', () => {
+    const html = renderToStaticMarkup(h(BattleScreen, battleProps(toBattle('ai'), 'ai')));
+    const switches = html.slice(html.indexOf('actions__grid--cards'));
+
+    // 控えは 器 と 魔球。カードなので効果テキストまで入る
+    expect(switches).toContain('unit-card');
+    expect(switches).toContain('器');
+    expect(switches).toContain('控えの生存ユニット1体を選択し、HPを15回復する。');
+    expect(switches).toContain('hp__track'); // HPバーも出る
+  });
+
+  /**
+   * 控えの位置が「ラベルの横」と「1行下」で揺れていた。
+   * flex-wrap に任せず、**1行目=ラベル+設置、2行目=控え** に固定してある。
+   */
+  it('控えは必ずラベルの1行下に出る', () => {
+    const html = renderToStaticMarkup(h(BattleScreen, battleProps(toBattle('ai'), 'ai')));
+
+    // meta の中で「見出し行」が閉じてから控えが始まる
+    const meta = html.slice(html.indexOf('stage__meta--left'), html.indexOf('stage__meta--right'));
+    expect(meta).toContain('stage__meta-head');
+    expect(meta.indexOf('stage__meta-head')).toBeLessThan(meta.indexOf('bench-dots'));
+    // 控えは見出し行の外にある (中に入っていると横並びに戻る)
+    expect(meta.indexOf('</div>')).toBeLessThan(meta.indexOf('bench-dots'));
+  });
+
+  it('再生中はタップの案内とスキップが両方出る', () => {
+    const state = toBattle('ai');
+    const action = legalActionsFor(state, 'p1')[0];
+    if (!action) throw new Error('合法手がありません');
+    const html = renderToStaticMarkup(
+      h(BattleScreen, battleProps(reduce(state, { type: 'declareAction', action }), 'ai')),
+    );
+
+    expect(html).toContain('画面をタップで次へ');
+    expect(html).toContain('スキップ');
+    // 全画面のタップ層は「1コマ進める」
+    expect(html).toContain('aria-label="1コマ進める"');
+  });
+
+  /**
+   * 編成5体はいつでも見返せる (SPEC §1 で相互公開)。ただし
+   * **どの3体を選出したかは分からないままにする** (SPEC §11)。
+   * `UnitState` を渡さない形にしてあるので、HPも状態も出ない。
+   */
+  it('相手の編成5体を開ける。選出の印は付かない', () => {
+    const state = toBattle('hotseat');
+    const html = renderToStaticMarkup(
+      h(PartyDetail, { label: 'プレイヤー2', party: PARTY_B, onClose: noop }),
+    );
+
+    // 5体すべてが読める
+    for (const id of PARTY_B) {
+      expect(html).toContain(getUnit(id).name);
+    }
+    expect(html).toContain('プレイヤー2 の編成');
+
+    // 選出3体を絞り込む手掛かりを出さない
+    expect(html).not.toContain('hp__track'); // HPバー = 場に出た証拠になる
+    expect(html).not.toContain('is-selected');
+    expect(html).not.toContain('badges');
+
+    // 盤面側にも入口がある
+    const stage = renderToStaticMarkup(h(BattleScreen, battleProps(state, 'hotseat')));
+    expect(stage).toContain('stage__party-button');
+  });
+
+  /**
+   * アイコン・名前・属性・速度は1行に収める。
+   * **折り返しが起きると、その下のHPバーの高さがカードごとにずれる**ので、
+   * 1行に収まる構造であることを検査する(高さそのものは CSS の話)。
+   */
+  it('ステージの名前・属性・速度が1行に並ぶ', () => {
+    const html = renderToStaticMarkup(h(BattleScreen, battleProps(toBattle('ai'), 'ai')));
+
+    const rows = html.split('stage-unit__name-row').slice(1);
+    expect(rows.length).toBe(2); // 左右2体
+    for (const row of rows) {
+      const head = row.slice(0, row.indexOf('</div>'));
+      expect(head.indexOf('stage-unit__name')).toBeLessThan(head.indexOf('stage-unit__tags'));
+      expect(head).toContain('attr-label');
+      expect(head).toContain('speed-badge');
+    }
+  });
+
+  it('カードの見出しが「アイコン + 名前」と「属性 + 速度」の1行になっている', () => {
+    const html = renderToStaticMarkup(h(PartyScreen, { side: 'p1', showSide: true, onSubmit: noop }));
+
+    const heads = html.split('unit-card__head').slice(1);
+    expect(heads.length).toBe(15);
+    for (const head of heads) {
+      // 左のかたまりにアイコンと名前が入り、属性・速度はその兄弟として続く
+      expect(head.indexOf('unit-card__title')).toBeLessThan(head.indexOf('unit-card__icon'));
+      expect(head.indexOf('unit-card__icon')).toBeLessThan(head.indexOf('unit-card__name'));
+      expect(head.indexOf('unit-card__name')).toBeLessThan(head.indexOf('unit-card__tags'));
+    }
   });
 
   it('控えを押せるようになっている', () => {
@@ -314,8 +484,12 @@ describe('今回足した表示', () => {
     const html = renderToStaticMarkup(
       h(BattleScreen, { ...battleProps(state, 'ai'), battle: poisoned }),
     );
+    // バーの色分けは残す (何点消えるかを目で見る仕掛け)
     expect(html).toContain('hp__fill--poison');
-    expect(html).toContain('毒 −20');
+    // **文字はバッジ側だけ。** HP数値の横に重ねて出さない
+    expect(html).toContain('毒 2重 (20/ターン)');
+    expect(html).not.toContain('毒 −20');
+    expect(html).not.toContain('hp__poison');
   });
 
   it('対人戦は再生前に「2人とも画面を見ていますか?」で止まる', () => {
@@ -386,7 +560,7 @@ describe('今回足した表示', () => {
     expect(html).toContain('panel-gate');
     expect(html).toContain('プレイヤー2 の入力です');
     // ステージ・HP・ログが出たまま
-    expect(html).toContain('stage__side--left');
+    expect(html).toContain('stage-unit--left');
     expect(html).toContain('hp__track');
     expect(html).toContain('バトルログ');
     // ただし行動選択は出さない (SPEC §11)
