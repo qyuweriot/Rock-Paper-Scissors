@@ -25,6 +25,7 @@ import { playCue, playFrame, restoreMuted, toggleMuted, unlock } from './audio';
 import type { Frame } from './playback';
 import { HandoffGate } from './components/HandoffGate';
 import { MuteButton } from './components/MuteButton';
+import { RulesOverlay } from './components/RulesOverlay';
 import { BattleScreen } from './screens/BattleScreen';
 import { ModeScreen } from './screens/ModeScreen';
 import { PartyScreen } from './screens/PartyScreen';
@@ -75,6 +76,9 @@ export function App() {
    */
   const [muted, setMutedState] = useState(restoreMuted);
 
+  /** ルール説明の覆い。開いていても対戦の状態は何も動かない */
+  const [showRules, setShowRules] = useState(false);
+
   /**
    * ボタンの操作音を1か所で拾う。
    *
@@ -102,23 +106,46 @@ export function App() {
    * 結果が画面から消えてしまう。あちらは操作欄に出す (BattleScreen の PanelGate)。
    */
   const gate = gateMessage(state);
-  const mute = <MuteButton muted={muted} onToggle={() => setMutedState(toggleMuted())} />;
+
+  /**
+   * どの画面にも同じ場所で出る操作。**画面の切り替えとは無関係**なので、
+   * 遷移の状態機械 (flow.ts) には持たせず、ここのローカルな状態で足りる。
+   */
+  const corner = (
+    <div className="corner-tools">
+      <button
+        type="button"
+        className="corner-tools__button"
+        onClick={() => setShowRules(true)}
+        title="ルールを見る"
+      >
+        <span aria-hidden="true">?</span>
+        <span className="visually-hidden">ルールを見る</span>
+      </button>
+      <MuteButton muted={muted} onToggle={() => setMutedState(toggleMuted())} />
+    </div>
+  );
+  const rules = showRules && <RulesOverlay onClose={() => setShowRules(false)} />;
 
   if (gate) {
     return (
       <main className="app" onClick={handleClick}>
-        {mute}
+        {corner}
         <HandoffGate message={gate} onConfirm={() => dispatch({ type: 'confirmGate' })} />
+        {rules}
       </main>
     );
   }
 
   return (
     <main className="app" onClick={handleClick}>
-      {mute}
+      {corner}
 
       {screen.kind === 'mode' && (
-        <ModeScreen onStart={(mode, aiLevel) => dispatch({ type: 'chooseMode', mode, aiLevel })} />
+        <ModeScreen
+          onStart={(mode, aiLevel) => dispatch({ type: 'chooseMode', mode, aiLevel })}
+          onShowRules={() => setShowRules(true)}
+        />
       )}
 
       {screen.kind === 'party' && (
@@ -167,6 +194,8 @@ export function App() {
           onToTitle={() => dispatch({ type: 'toTitle' })}
         />
       )}
+
+      {rules}
     </main>
   );
 }

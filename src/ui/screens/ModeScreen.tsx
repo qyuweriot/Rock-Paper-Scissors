@@ -8,9 +8,11 @@ import type { Mode } from '../flow';
 
 interface Props {
   onStart: (mode: Mode, aiLevel: AiLevel) => void;
+  /** ルール説明を開く。**初見が最初に見る画面**なので、右上の「?」とは別に大きく置く */
+  onShowRules: () => void;
 }
 
-export function ModeScreen({ onStart }: Props) {
+export function ModeScreen({ onStart, onShowRules }: Props) {
   const [aiLevel, setAiLevel] = useState<AiLevel>(2);
 
   return (
@@ -24,6 +26,11 @@ export function ModeScreen({ onStart }: Props) {
         {TYPE_TRIANGLE} の相性で戦います。全15種から {PARTY_SIZE} 体を編成し、
         相手の編成を見てから {TEAM_SIZE} 体を選出します。
       </p>
+
+      {/* 上の一行は要約。毒・設置・反射・優先度はここを開かないと分からない */}
+      <button type="button" className="btn btn--ghost btn--rules" onClick={onShowRules}>
+        ルールを見る
+      </button>
 
       <section className="mode-block">
         <h2>AI戦</h2>

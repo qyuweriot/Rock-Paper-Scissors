@@ -88,16 +88,23 @@ button {
 }
 
 /*
-  効果音の入切。**どの画面でも同じ場所**に出す。
+  ルールと効果音の入切。**どの画面でも同じ場所**に出す。
   盤面の内側に置くと画面ごとに位置が変わるので、ビューポートに対して固定する。
 */
-.mute-button {
+.corner-tools {
   position: fixed;
   top: 0.75rem;
   right: 0.75rem;
   /* 再生中の全面ボタン (5) より上、詳細の覆い (20) より下。覆いが出たら隠れてよい */
   z-index: 15;
+  display: flex;
+  gap: 0.35rem;
+}
+
+.corner-tools__button,
+.mute-button {
   padding: 0.35rem 0.55rem;
+  min-width: 2.1rem;
   font-size: 1.1rem;
   line-height: 1;
   color: var(--text);
@@ -108,6 +115,7 @@ button {
   opacity: 0.75;
 }
 
+.corner-tools__button:hover,
 .mute-button:hover {
   opacity: 1;
 }
@@ -601,10 +609,10 @@ button.unit-card:disabled {
   min-height: 2.6rem;
   margin-bottom: 0.6rem;
   /*
-    右上の消音ボタンのぶんを空ける。**狭い画面ではスキップの真上に重なる** ─
-    盤面が画面幅いっぱいに広がると、両者が同じ隅を取り合う。
+    右上の常設ボタン (ルール・消音) のぶんを空ける。**狭い画面ではスキップの真上に重なる** ─
+    盤面が画面幅いっぱいに広がると、両者が同じ隅を取り合う。ボタンを増やしたら広げること。
   */
-  padding-right: 2.75rem;
+  padding-right: 5.4rem;
 }
 
 .battle-head__turn {
@@ -1558,6 +1566,61 @@ button.unit-card:disabled {
 /* 編成一覧は5枚並ぶので広めに取る */
 .detail__panel--party {
   width: min(30rem, 100%);
+}
+
+/* ルールは文章なので、1行が長くなりすぎない幅で止める */
+.detail__panel--rules {
+  width: min(34rem, 100%);
+  gap: 1.1rem;
+  padding: 1.2rem 1.3rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+  text-align: left;
+}
+
+.rules-doc__section {
+  display: grid;
+  gap: 0.7rem;
+}
+
+.rules-doc__heading {
+  margin: 0;
+  padding-bottom: 0.3rem;
+  font-size: 0.95rem;
+  color: var(--accent);
+  border-bottom: 1px solid var(--border);
+}
+
+.rules-doc__item-title {
+  margin: 0 0 0.15rem;
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.rules-doc__lines {
+  margin: 0;
+  padding-left: 1.1rem;
+  display: grid;
+  gap: 0.2rem;
+  font-size: 0.85rem;
+  line-height: 1.55;
+  color: var(--muted);
+}
+
+/* 「ここまでで始められる」の区切り。読み進める義務がないことを示す */
+.rules-doc__note {
+  margin: 0;
+  padding: 0.4rem 0.6rem;
+  font-size: 0.8rem;
+  color: var(--text);
+  background: var(--surface-2);
+  border-left: 3px solid var(--ok);
+  border-radius: 0.25rem;
+}
+
+.btn--rules {
+  margin-bottom: 1.25rem;
 }
 
 .detail__title {

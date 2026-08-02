@@ -20,6 +20,8 @@ import { BattleScreen } from './screens/BattleScreen';
 import { ResultScreen } from './screens/ResultScreen';
 import { HandoffGate } from './components/HandoffGate';
 import { PartyDetail } from './components/PartyDetail';
+import { RulesOverlay } from './components/RulesOverlay';
+import { RULE_SECTIONS } from './rules';
 import {
   currentFrame,
   displayBattle,
@@ -85,7 +87,7 @@ const battleProps = (state: FlowState, mode: 'ai' | 'hotseat') => {
 
 describe('画面の描画', () => {
   it('モード選択', () => {
-    const html = renderToStaticMarkup(h(ModeScreen, { onStart: noop }));
+    const html = renderToStaticMarkup(h(ModeScreen, { onStart: noop, onShowRules: noop }));
     expect(html).toContain('じゃんけんバトル');
     expect(html).toContain('AI戦');
     expect(html).toContain('対人戦');
@@ -435,6 +437,21 @@ describe('今回足した表示', () => {
     // 盤面側にも入口がある
     const stage = renderToStaticMarkup(h(BattleScreen, battleProps(state, 'hotseat')));
     expect(stage).toContain('stage__party-button');
+  });
+
+  /**
+   * ルール説明 (SPEC §1〜§8)。**中身の検証は rules.test.ts** が受け持つので、
+   * ここは描画経路が通ることと、タイトル画面から開けることだけを見る。
+   */
+  it('ルール説明が描け、タイトルに入口がある', () => {
+    const html = renderToStaticMarkup(h(RulesOverlay, { onClose: noop }));
+
+    for (const section of RULE_SECTIONS) {
+      expect(html).toContain(section.heading);
+    }
+
+    const title = renderToStaticMarkup(h(ModeScreen, { onStart: noop, onShowRules: noop }));
+    expect(title).toContain('ルールを見る');
   });
 
   /**
