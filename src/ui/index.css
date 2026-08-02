@@ -75,6 +75,47 @@ button {
 
 /* --- 汎用 ---------------------------------------------------------------- */
 
+/* 読み上げにだけ渡す文言。目には見えないが表示領域は取らせない */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/*
+  効果音の入切。**どの画面でも同じ場所**に出す。
+  盤面の内側に置くと画面ごとに位置が変わるので、ビューポートに対して固定する。
+*/
+.mute-button {
+  position: fixed;
+  top: 0.75rem;
+  right: 0.75rem;
+  /* 再生中の全面ボタン (5) より上、詳細の覆い (20) より下。覆いが出たら隠れてよい */
+  z-index: 15;
+  padding: 0.35rem 0.55rem;
+  font-size: 1.1rem;
+  line-height: 1;
+  color: var(--text);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  cursor: pointer;
+  opacity: 0.75;
+}
+
+.mute-button:hover {
+  opacity: 1;
+}
+
+.mute-button.is-muted {
+  opacity: 0.55;
+}
+
 .screen__head {
   margin-bottom: 1.25rem;
 }
@@ -559,6 +600,11 @@ button.unit-card:disabled {
   gap: 0.5rem;
   min-height: 2.6rem;
   margin-bottom: 0.6rem;
+  /*
+    右上の消音ボタンのぶんを空ける。**狭い画面ではスキップの真上に重なる** ─
+    盤面が画面幅いっぱいに広がると、両者が同じ隅を取り合う。
+  */
+  padding-right: 2.75rem;
 }
 
 .battle-head__turn {

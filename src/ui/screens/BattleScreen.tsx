@@ -106,6 +106,8 @@ export function BattleScreen({
           type="button"
           className="playback-skip-layer"
           aria-label="1コマ進める"
+          // 送った先のコマが自分の音を鳴らす。操作音まで足すと二重に聞こえる
+          data-se="none"
           onClick={onAdvancePlayback}
         />
       )}
