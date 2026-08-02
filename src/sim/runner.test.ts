@@ -146,8 +146,13 @@ describe('runGame — 1試合の実行', () => {
       expect(scoreAgainstRandom(2)).toBeGreaterThan(0.65);
     });
 
+    /*
+     * **既定の5秒では足りない。** Lv3 は数手先まで読むので1手が Lv2 の十数倍かかり、
+     * ここは総当たりで数百試合を回す。試合数を削ると統計としての意味が落ちるので、
+     * 時間の方を広げる。
+     */
     it('Lv3 がランダムに大きく勝ち越す', () => {
       expect(scoreAgainstRandom(3)).toBeGreaterThan(0.65);
-    });
+    }, 30_000);
   });
 });

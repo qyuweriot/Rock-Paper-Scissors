@@ -16,7 +16,7 @@ export const AI_LEVELS: readonly AiLevel[] = [1, 2, 3];
 export const AI_LEVEL_LABELS: Record<AiLevel, string> = {
   1: 'ランダム',
   2: '貪欲(1手先の盤面を評価)',
-  3: '先読み(相手の手を読んで応じる)',
+  3: '先読み(数手先まで読む)',
 };
 
 /**

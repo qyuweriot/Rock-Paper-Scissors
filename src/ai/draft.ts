@@ -13,24 +13,47 @@ import { nextInt } from '../engine/rng';
 import { getUnit, UNIT_IDS, type UnitId } from '../data/units';
 import type { Attribute } from '../engine/types';
 
+/** 編成に必ず1体ずつ入れる属性 (SPEC §2)。**この順で引く**ので、並びを変えると編成が変わる */
+const ATTRIBUTES: readonly Attribute[] = ['gu', 'choki', 'pa'];
+
 /**
  * 15種から PARTY_SIZE 体を選ぶ (SPEC §1)。
  *
- * 属性の偏りを避けたいところだが、**偏った編成も正当な戦術**であり、
- * ここで均さすと三竦みの実験ができなくなる。一様な抽選にする。
- * 同じシードなら同じ編成になる。
+ * **三属性を1体ずつ確保してから、残りを一様に引く。**
+ *
+ * 以前は全枠を一様抽選にしていた。「偏った編成も正当な戦術」という理屈だったが、
+ * 実際には AI がしばしばグーだけの編成を持ってきて、**人間がパーを並べるだけで
+ * 勝ててしまう**。三竦みのゲームで属性が欠けているのは戦術ではなく事故で、
+ * 対戦相手としての体裁が崩れる。
+ *
+ * 残り2枠は従来どおり一様なので、編成の多様性は保たれる。
+ * 同じシードなら同じ編成になる (PLAN §3.4)。
+ *
+ * **シミュレータはこの関数を呼ばない** (選出を直接渡す) ので、`reports/` は変わらない。
  */
 export function draftParty(seed: number): { seed: number; party: UnitId[] } {
   const pool = [...UNIT_IDS];
   const party: UnitId[] = [];
   let rngSeed = seed;
 
-  for (let i = 0; i < PARTY_SIZE; i++) {
-    const rolled = nextInt(rngSeed, pool.length);
+  /** pool から1体引いて party に入れる。候補が空なら何もしない */
+  const draw = (candidates: UnitId[]): void => {
+    if (candidates.length === 0) return;
+    const rolled = nextInt(rngSeed, candidates.length);
     rngSeed = rolled.seed;
-    const [picked] = pool.splice(rolled.value, 1);
-    if (picked) party.push(picked);
+    const picked = candidates[rolled.value];
+    if (!picked) return;
+    party.push(picked);
+    pool.splice(pool.indexOf(picked), 1);
+  };
+
+  // 先に三属性を1体ずつ。ここで PARTY_SIZE を超えることはない (3 < 5)
+  for (const attribute of ATTRIBUTES) {
+    draw(pool.filter((id) => getUnit(id).attribute === attribute));
   }
+
+  // 残りは属性を問わず一様に
+  while (party.length < PARTY_SIZE) draw(pool);
 
   return { seed: rngSeed, party };
 }

@@ -42,6 +42,37 @@ describe('draftParty — AIの編成 (SPEC §1)', () => {
     }
     expect(seen.size).toBe(UNIT_IDS.length);
   });
+
+  /**
+   * **三属性が必ず入る。**
+   *
+   * 以前は全枠が一様抽選で、AI がグーだけの編成を持ってくることがあった。
+   * 三竦みのゲームで属性が欠けているのは戦術ではなく事故で、
+   * 人間がその裏の属性を並べるだけで勝ててしまう。
+   */
+  it('三属性がすべて入る', () => {
+    for (let seed = 0; seed < 200; seed++) {
+      const attributes = new Set(draftParty(seed).party.map((id) => getUnit(id).attribute));
+      expect(attributes, `seed ${String(seed)} の編成に欠けている属性がある`).toEqual(
+        new Set(['gu', 'choki', 'pa']),
+      );
+    }
+  });
+
+  it('残りの枠は属性を問わない。同じ属性が偏って入ることもある', () => {
+    // 均し過ぎると編成が毎回同じ形になる。確保するのは「1体ずつ」までで、
+    // 残り2枠は自由 ─ 4体が同じ属性になる編成も出てよい
+    let sawSkew = false;
+    for (let seed = 0; seed < 200 && !sawSkew; seed++) {
+      const counts = new Map<string, number>();
+      for (const id of draftParty(seed).party) {
+        const attr = getUnit(id).attribute;
+        counts.set(attr, (counts.get(attr) ?? 0) + 1);
+      }
+      if ([...counts.values()].some((n) => n >= 3)) sawSkew = true;
+    }
+    expect(sawSkew).toBe(true);
+  });
 });
 
 describe('draftTeam — AIの選出 (SPEC §1)', () => {
